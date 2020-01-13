@@ -1,0 +1,49 @@
+diff -Naur sos-3.7-new/sos/policies/redhat.py sos-3.7-any/sos/policies/redhat.py
+--- sos-3.7-new/sos/policies/redhat.py	2019-08-29 11:09:29.161938380 +0000
++++ sos-3.7-any/sos/policies/redhat.py	2019-08-29 11:52:41.310288883 +0000
+@@ -300,7 +300,7 @@
+             pkgname = self.pkgs[rr[0]]["version"]
+             if pkgname[0] == "4":
+                 return 4
+-            elif pkgname[0] in ["5Server", "5Client"]:
++            elif pkgname[0] in ["5Server", "5Client", "5"]:
+                 return 5
+             elif pkgname[0] == "6":
+                 return 6
+@@ -447,4 +447,36 @@
+             self.all_pkgs_by_name_regex("fedora-release-.*")[-1]
+         return int(pkg["version"])
+ 
++class AnyELPolicy(RHELPolicy):
++    TEST_NAME="Red Hat"
++    def __init__(self, sysroot=None):
++        super(AnyELPolicy, self).__init__(sysroot=sysroot)
++        self.register_presets(rhel_presets)
++    @classmethod
++    def check(cls):
++        if not os.path.exists(OS_RELEASE):
++            return False
++        with open(OS_RELEASE, "r") as f:
++            for line in f:
++                if line.startswith("NAME"):
++                    (name, value) = line.split("=")
++                    value = value.strip("\"'")
++                    if cls.TEST_NAME in value:
++                        return True
++        return False
++
++class CentOSPolicy(AnyELPolicy):
++    TEST_NAME="CentOS"
++    def __init__(self, sysroot=None):
++        super(CentOSPolicy, self).__init__(sysroot=sysroot)
++
++class OracleLinuxPolicy(AnyELPolicy):
++    TEST_NAME="Oracle"
++    def __init__(self, sysroot=None):
++        super(OracleLinuxPolicy, self).__init__(sysroot=sysroot)
++
++class ScientificLinuxPolicy(AnyELPolicy):
++    TEST_NAME="Scientific"
++    def __init__(self, sysroot=None):
++        super(ScientificLinuxPolicy, self).__init__(sysroot=sysroot)
+ # vim: set et ts=4 sw=4 :

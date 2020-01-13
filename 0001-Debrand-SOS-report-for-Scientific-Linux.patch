@@ -1,0 +1,58 @@
+diff --git a/sos/policies/redhat.py b/sos/policies/redhat.py
+index 6aec782..de68649 100644
+--- a/sos/policies/redhat.py
++++ b/sos/policies/redhat.py
+@@ -31,9 +31,9 @@ OS_RELEASE = "/etc/os-release"
+ 
+ 
+ class RedHatPolicy(LinuxPolicy):
+-    distro = "Red Hat"
+-    vendor = "Red Hat"
+-    vendor_url = "http://www.redhat.com/"
++    distro = "Scientific Linux"
++    vendor = "Scientific Linux"
++    vendor_url = "http://www.scientificlinux.org/"
+     _redhat_release = '/etc/redhat-release'
+     _tmp_dir = "/var/tmp"
+     _rpmq_cmd = 'rpm -qa --queryformat "%{NAME}|%{VERSION}|%{RELEASE}\\n"'
+@@ -92,9 +92,9 @@ class RedHatPolicy(LinuxPolicy):
+ 
+     @classmethod
+     def check(cls):
+-        """This method checks to see if we are running on Red Hat. It must be
++        """This method checks to see if we are running on SL. It must be
+         overriden by concrete subclasses to return True when running on a
+-        Fedora, RHEL or other Red Hat distribution or False otherwise."""
++        Fedora, RHEL or other distribution or False otherwise."""
+         return False
+ 
+     def check_usrmove(self, pkgs):
+@@ -198,7 +198,7 @@ _cb_plugs = ['abrt', 'block', 'boot', 'dnf', 'dracut', 'filesys', 'grub2',
+              'hardware', 'host', 'kernel', 'logs', 'lvm2', 'memory', 'rpm',
+              'process', 'systemd', 'yum', 'xfs']
+ 
+-RHEL_RELEASE_STR = "Red Hat Enterprise Linux"
++RHEL_RELEASE_STR = "Scientific Linux"
+ 
+ RHV = "rhv"
+ RHV_DESC = "Red Hat Virtualization"
+@@ -254,8 +254,8 @@ No changes will be made to system configuration.
+ 
+ class RHELPolicy(RedHatPolicy):
+     distro = RHEL_RELEASE_STR
+-    vendor = "Red Hat"
+-    vendor_url = "https://access.redhat.com/support/"
++    vendor = "Scientific Linux"
++    vendor_url = "https://www.scientificlinux.org/"
+     msg = _("""\
+ This command will collect diagnostic and configuration \
+ information from this %(distro)s system and installed \
+@@ -274,7 +274,7 @@ support representative.
+     def check(cls):
+         """Test to see if the running host is a RHEL installation.
+ 
+-            Checks for the presence of the "Red Hat Enterprise Linux"
++            Checks for the presence of the "Scientific Linux"
+             release string at the beginning of the NAME field in the
+             `/etc/os-release` file and returns ``True`` if it is
+             found, and ``False`` otherwise.
