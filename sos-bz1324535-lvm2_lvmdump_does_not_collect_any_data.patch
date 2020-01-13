@@ -1,0 +1,13 @@
+diff -up sos-3.2/sos/plugins/lvm2.py.org sos-3.2/sos/plugins/lvm2.py
+--- sos-3.2/sos/plugins/lvm2.py.org	2016-10-17 13:14:41.145309765 -0400
++++ sos-3.2/sos/plugins/lvm2.py	2016-10-17 13:19:54.073307211 -0400
+@@ -36,7 +36,8 @@ class Lvm2(Plugin, RedHatPlugin, DebianP
+         if metadata:
+             lvmdump_opts = "-a -m"
+         cmd = lvmdump_cmd % (lvmdump_opts,
+-                             self.get_cmd_output_path(name="lvmdump"))
++                             self.get_cmd_output_path(name="lvmdump",
++                                                      make=False))
+         self.add_cmd_output(cmd)
+ 
+     def setup(self):

@@ -1,0 +1,217 @@
+From d978c9dd461a79295f495b01a5d632d086ff646c Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Fri, 6 Feb 2015 11:24:26 -0500
+Subject: [PATCH 1/3] [cluster] Removed some files and command that are no
+ longer needed. rhbz #1083656
+
+Removed some of the files and commands that are no longer needed on RHEL6+.
+In addition, the gfs_lockdump option did not capture gfs2 lock dumps.
+The option isnow called gfs2_lockdump and will mount the /sys/kernel/debug
+directory and the gfs2 lockdumps will be copied from that mount point.
+
+In addition added a couple files that are needed for pacemaker/dlm.
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/cluster.py | 66 +++++++++++++++++++++++++++++---------------------
+ 1 file changed, 39 insertions(+), 27 deletions(-)
+
+diff --git a/sos/plugins/cluster.py b/sos/plugins/cluster.py
+index 9b5eb22..af6d0a4 100644
+--- a/sos/plugins/cluster.py
++++ b/sos/plugins/cluster.py
+@@ -14,18 +14,19 @@
+ 
+ from sos.plugins import Plugin, RedHatPlugin
+ import re
++import os.path
+ from glob import glob
+ from datetime import datetime, timedelta
+ 
+ 
+ class Cluster(Plugin, RedHatPlugin):
+-    """Red Hat Cluster Suite and GFS
++    """Red Hat Cluster High Availability and GFS2
+     """
+ 
+     plugin_name = 'cluster'
+     profiles = ('cluster',)
+     option_list = [
+-        ("gfslockdump", 'gather output of gfs lockdumps', 'slow', False),
++        ("gfs2lockdump", 'gather output of gfs2 lockdumps', 'slow', False),
+         ("crm_from", 'specify the start time for crm_report', 'fast', False),
+         ('lockdump', 'gather dlm lockdumps', 'slow', False)
+     ]
+@@ -42,12 +43,16 @@ class Cluster(Plugin, RedHatPlugin):
+ 
+     files = ["/etc/cluster/cluster.conf"]
+ 
++    debugfs_path = "/sys/kernel/debug"
++    _debugfs_cleanup = False
++
+     def setup(self):
+ 
+         self.add_copy_spec([
+             "/etc/cluster.conf",
+-            "/etc/cluster.xml",
+             "/etc/cluster",
++            "/etc/sysconfig/dlm",
++            "/etc/sysconfig/pacemaker",
+             "/etc/sysconfig/cluster",
+             "/etc/sysconfig/cman",
+             "/etc/fence_virt.conf",
+@@ -56,12 +61,12 @@ class Cluster(Plugin, RedHatPlugin):
+             "/var/lib/luci/etc",
+             "/var/log/cluster",
+             "/var/log/luci",
+-            "/etc/fence_virt.conf",
+             "/sys/fs/gfs2/*/withdraw"
+         ])
+ 
+-        if self.get_option('gfslockdump'):
+-            self.do_gfslockdump()
++        if self.get_option('gfs2lockdump'):
++            if (self._mount_debug()):
++                self.add_copy_spec(["/sys/kernel/debug/gfs2/*"])
+ 
+         if self.get_option('lockdump'):
+             self.do_lockdump()
+@@ -81,7 +86,6 @@ class Cluster(Plugin, RedHatPlugin):
+             "corosync-quorumtool -s",
+             "corosync-cpgtool",
+             "corosync-objctl",
+-            "group_tool ls -g1",
+             "gfs_control ls -n",
+             "gfs_control dump",
+             "fence_tool dump",
+@@ -108,26 +112,29 @@ class Cluster(Plugin, RedHatPlugin):
+                             % (crm_dest, crm_from))
+ 
+     def do_lockdump(self):
+-        dlm_tool = "dlm_tool ls"
+-        result = self.call_ext_prog(dlm_tool)
+-        if result['status'] != 0:
+-            return
+-
+-        lock_exp = r'^name\s+([^\s]+)$'
+-        lock_re = re.compile(lock_exp, re.MULTILINE)
+-        for lockspace in lock_re.findall(result['output']):
+-            self.add_cmd_output(
+-                "dlm_tool lockdebug -svw '%s'" % lockspace,
+-                suggest_filename="dlm_locks_%s" % lockspace
+-            )
+-
+-    def do_gfslockdump(self):
+-        mnt_exp = r'^\S+\s+([^\s]+)\s+gfs\s+.*$'
+-        for mnt in self.do_regex_find_all(mnt_exp, "/proc/mounts"):
+-            self.add_cmd_output(
+-                "gfs_tool lockdump %s" % mnt,
+-                suggest_filename="gfs_lockdump_" + self.mangle_command(mnt)
+-            )
++        if (self._mount_debug()):
++            dlm_tool = "dlm_tool ls"
++            result = self.call_ext_prog(dlm_tool)
++            if result['status'] != 0:
++                return
++
++            lock_exp = r'^name\s+([^\s]+)$'
++            lock_re = re.compile(lock_exp, re.MULTILINE)
++            for lockspace in lock_re.findall(result['output']):
++                self.add_cmd_output(
++                    "dlm_tool lockdebug -svw '%s'" % lockspace,
++                    suggest_filename="dlm_locks_%s" % lockspace
++                )
++
++    def _mount_debug(self):
++        if not os.path.ismount(self.debugfs_path):
++            self._debugfs_cleanup = True
++            r = self.call_ext_prog("mount -t debugfs debugfs %s"
++                                   % self.debugfs_path)
++            if r['status'] != 0:
++                self._log_error("debugfs not mounted and mount attempt failed")
++                self._debugfs_cleanup = False
++        return os.path.ismount(self.debugfs_path)
+ 
+     def postproc(self):
+         for cluster_conf in glob("/etc/cluster/cluster.conf*"):
+@@ -148,6 +155,11 @@ class Cluster(Plugin, RedHatPlugin):
+             r"(.*fence.*\.passwd=)(.*)",
+             r"\1******"
+         )
++        if self._debugfs_cleanup and os.path.ismount(self.debugfs_path):
++            r = self.call_ext_prog("umount %s" % self.debugfs_path)
++            if r['status'] != 0:
++                self._log_error("could not unmount %s" % self.debugfs_path)
++
+         return
+ 
+ # vim: et ts=4 sw=4
+-- 
+1.8.3.1
+
+
+From b53d90c853a029644d1b4de2ab16dd03c8e7edfb Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Tue, 10 Feb 2015 10:42:39 -0500
+Subject: [PATCH 2/3] [cluster] Add luci to packages for standalone luci
+ servers - rhbz# 1171186
+
+A host with only luci package installed would not collect luci logs
+because the cluster plugin would not run since none of the packages
+were found. This patch adds luci to the package set required for the
+ plugin to run.
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/cluster.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sos/plugins/cluster.py b/sos/plugins/cluster.py
+index af6d0a4..92fb08b 100644
+--- a/sos/plugins/cluster.py
++++ b/sos/plugins/cluster.py
+@@ -32,6 +32,7 @@ class Cluster(Plugin, RedHatPlugin):
+     ]
+ 
+     packages = [
++        "luci",
+         "ricci",
+         "corosync",
+         "openais",
+-- 
+1.8.3.1
+
+
+From cfbe98a8c756b75fac158b4d62380545f0a466be Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Tue, 17 Feb 2015 13:54:01 -0500
+Subject: [PATCH 3/3] [cluster] Added a couple pcs commands to the cluster
+ plugin.
+
+There are 3 pcs commands added to cluster plugin to get
+information about the status of pacemaker cluster.
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/cluster.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/sos/plugins/cluster.py b/sos/plugins/cluster.py
+index 92fb08b..4851c57 100644
+--- a/sos/plugins/cluster.py
++++ b/sos/plugins/cluster.py
+@@ -92,7 +92,10 @@ class Cluster(Plugin, RedHatPlugin):
+             "fence_tool dump",
+             "dlm_tool dump",
+             "dlm_tool ls -n",
+-            "mkqdisk -L"
++            "mkqdisk -L",
++            "pcs config",
++            "pcs status",
++            "pcs property list --all"
+         ])
+ 
+         # crm_report needs to be given a --from "YYYY-MM-DD HH:MM:SS" start
+-- 
+1.8.3.1
+

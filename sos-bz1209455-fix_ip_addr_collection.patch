@@ -1,0 +1,28 @@
+From 79d90ff649f89f784bdf41769f2326faa11cb7b0 Mon Sep 17 00:00:00 2001
+From: Bryn M. Reeves <bmr@redhat.com>
+Date: Tue, 17 Mar 2015 13:50:37 +0000
+Subject: [PATCH] [networking] re-add 'ip addr' with a root symlink
+
+Commit e320ca8 accidentally deleted collection of "ip -o addr"
+and the root "ip_addr" symlink: put it back.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/networking.py |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/sos/plugins/networking.py b/sos/plugins/networking.py
+index ae6cb1b..ae5ea71 100644
+--- a/sos/plugins/networking.py
++++ b/sos/plugins/networking.py
+@@ -89,6 +89,7 @@ class Networking(Plugin):
+         self.add_forbidden_path("/proc/net/rpc/*/channel")
+         self.add_forbidden_path("/proc/net/rpc/*/flush")
+ 
++        self.add_cmd_output("ip -o addr", root_symlink = "ip_addr")
+         self.add_cmd_output("route -n", root_symlink="route")
+         self.collect_iptable("filter")
+         self.collect_iptable("nat")
+-- 
+1.7.1
+

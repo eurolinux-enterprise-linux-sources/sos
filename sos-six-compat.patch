@@ -1,0 +1,63 @@
+From b61a193b98b896164a8caefa088bb09297f1e3ca Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Wed, 1 Oct 2014 17:08:50 +0100
+Subject: [PATCH 1/2] [utilities] invert sense of six.PY2 test
+
+Old versions of six do not include a 'PY2' attribute leading to
+an exception in sos_get_command_output(). Invert the sense of the
+test and check that six.PY3 is false instead as all versions of
+the module include this attribute.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/utilities.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sos/utilities.py b/sos/utilities.py
+index 7c06781..7e8cd7e 100644
+--- a/sos/utilities.py
++++ b/sos/utilities.py
+@@ -139,7 +139,7 @@ def sos_get_command_output(command, timeout=300, runat=None):
+         command = "timeout %ds %s" % (timeout, command)
+ 
+     # shlex.split() reacts badly to unicode on older python runtimes.
+-    if six.PY2:
++    if not six.PY3:
+         command = command.encode('utf-8')
+     args = shlex.split(command)
+     try:
+-- 
+1.9.3
+
+
+From f9c811abc07f1e3044b1dbf29fdd5cd1f68812bc Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Wed, 1 Oct 2014 17:34:56 +0100
+Subject: [PATCH 2/2] [archive] invert sense of six.PY2 test
+
+Old versions of six do not include a 'PY2' attribute leading to
+an exception in sos_get_command_output(). Invert the sense of the
+test and check that six.PY3 is false instead as all versions of
+the module include this attribute.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/archive.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sos/archive.py b/sos/archive.py
+index 245f904..2e42bbd 100644
+--- a/sos/archive.py
++++ b/sos/archive.py
+@@ -357,7 +357,7 @@ class TarFileArchive(FileCacheArchive):
+ 
+     def _build_archive(self):
+         # python2.6 TarFile lacks the filter parameter
+-        if six.PY2 and sys.version_info[1] < 7:
++        if not six.PY3 and sys.version_info[1] < 7:
+             tar = _TarFile.open(self._archive_name, mode="w")
+         else:
+             tar = tarfile.open(self._archive_name, mode="w")
+-- 
+1.9.3
+

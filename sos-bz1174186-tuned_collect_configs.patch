@@ -1,0 +1,30 @@
+From 068c957e4c43edaefac3bc6401481ea572b033a5 Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Thu, 16 Apr 2015 11:00:23 -0400
+Subject: [PATCH] [tuned] Collect additional configurations files and profiles.
+
+Collect additional configurations files and profiles for tuned.
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/tuned.py |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/sos/plugins/tuned.py b/sos/plugins/tuned.py
+index 6e0394d..db3639c 100644
+--- a/sos/plugins/tuned.py
++++ b/sos/plugins/tuned.py
+@@ -31,6 +31,10 @@ class Tuned(Plugin, RedHatPlugin):
+             "tuned-adm recommend"
+         ])
+         self.add_copy_spec([
++            "/etc/tuned.conf",
++            "/etc/tune-profiles"
++        ])
++        self.add_copy_spec([
+             "/etc/tuned",
+             "/usr/lib/tuned",
+             "/var/log/tuned/tuned.log"
+-- 
+1.7.1
+

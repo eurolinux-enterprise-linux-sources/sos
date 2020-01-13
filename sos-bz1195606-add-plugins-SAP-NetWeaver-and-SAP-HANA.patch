@@ -1,0 +1,612 @@
+From e768bf71c96317bc64b643ab9262cb88f1d9058c Mon Sep 17 00:00:00 2001
+From: Luca Miccini <luca.miccini@redhat.com>
+Date: Tue, 24 Feb 2015 18:38:20 +0100
+Subject: [PATCH 1/7] [saphana] add SAP HANA plugin
+
+Add a plugin for the SAP HANA component and add it to a new 'sap'
+profile.
+
+Signed-off-by: Luca Miccini <luca.miccini@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/saphana.py | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
+ create mode 100644 sos/plugins/saphana.py
+
+diff --git a/sos/plugins/saphana.py b/sos/plugins/saphana.py
+new file mode 100644
+index 0000000..2ff26f5
+--- /dev/null
++++ b/sos/plugins/saphana.py
+@@ -0,0 +1,84 @@
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++import os
++from sos.plugins import Plugin, RedHatPlugin
++
++
++class saphana(Plugin, RedHatPlugin):
++    """SAP HANA"""
++
++    plugin_name = 'saphana'
++    profiles = ['sap']
++
++    files = ['/hana']
++
++    def setup(self):
++
++        sids = []
++
++        if os.path.isdir("/hana/shared"):
++            s = os.listdir("/hana/shared")
++            for sid in s:
++                if len(sid) == 3:
++                    sid = sid.strip()
++                    sids.append(sid)
++
++            for sid in sids:
++                sidadm = '%sadm' % sid.lower()
++
++                prefix = 'su - %s -c' % sidadm
++
++                self.add_cmd_output('%s "HDB info"' % prefix,
++                                    suggest_filename="%s_HDB_info" % sid)
++
++                self.add_cmd_output('%s "hdbsrvutil -v"' % prefix,
++                                    suggest_filename="%s_version" % sid)
++
++                self.add_cmd_output('%s \'hdbcons "mm l -s -S -p"\'' % prefix,
++                                    suggest_filename="%s_memusage" % sid)
++
++                self.add_cmd_output('%s \'hdbcons -e hdbindexserver \
++                                    "replication info"\'' % prefix,
++                                    suggest_filename="%s_replicainfo" % sid)
++
++                if os.path.isdir("/hana/shared/%s/" % sid):
++                    i = os.listdir("/hana/shared/%s/" % sid)
++                    for inst in i:
++                        if "HDB" in inst:
++                            inst = inst.strip()[-2:]
++
++                            # get GREEN/RED status
++                            self.add_cmd_output(
++                                'su - %s -c "sapcontrol -nr %s \
++                                -function GetProcessList"'
++                                % (sidadm, inst),
++                                suggest_filename="%s_%s_status"
++                                % (sid, inst)
++                            )
++
++                            path = '/usr/sap/%s/HDB%s/exe/python_support'
++                            path %= (sid, inst)
++
++                            if os.path.isdir("%s" % path):
++                                # SCALE OUT - slow
++                                self.add_cmd_output(
++                                    'su - %s -c "python \
++                                    %s/landscapeHostConfiguration.py"'
++                                    % (sidadm, path),
++                                    suggest_filename="%s_%s_landscapeConfig"
++                                    % (sid, inst)
++                                )
++
++# vim: et ts=4 sw=4
+-- 
+1.8.3.1
+
+
+From 581b05584410e48be998c98efe25ab9783641d1b Mon Sep 17 00:00:00 2001
+From: Luca Miccini <luca.miccini@redhat.com>
+Date: Fri, 13 Mar 2015 12:43:08 +0100
+Subject: [PATCH 2/7] [vhostmd] add new plugin
+
+Add a plugin for the Virtual Host Metrics Daemon (vhostmd) to
+collect VM performance metrics from the system.
+
+Fixes #527.
+
+Signed-off-by: Luca Miccini <luca.miccini@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/vhostmd.py | 52 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+ create mode 100644 sos/plugins/vhostmd.py
+
+diff --git a/sos/plugins/vhostmd.py b/sos/plugins/vhostmd.py
+new file mode 100644
+index 0000000..6711945
+--- /dev/null
++++ b/sos/plugins/vhostmd.py
+@@ -0,0 +1,52 @@
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++from sos.plugins import Plugin, RedHatPlugin
++
++
++class vhostmd(Plugin, RedHatPlugin):
++    """vhostmd virtualization metrics collection
++    """
++
++    plugin_name = 'vhostmd'
++    profiles = ['sap']
++
++    packages = ['virt-what']
++
++    def setup(self):
++        vw = self.get_command_output("virt-what")['output'].splitlines()
++
++        if not vw:
++            return
++
++        if "vmware" in vw or "kvm" in vw or "xen" in vw:
++            # if vm-dump-metrics is installed use it
++            if self.is_installed("vm-dump-metrics"):
++                self.add_cmd_output("vm-dump-metrics",
++                                    suggest_filename="virt_metrics")
++            else:
++                # otherwise use the raw vhostmd disk presented (256k size)
++                d = self.get_command_output("lsblk -d")
++                for disk in d['output'].splitlines():
++                    if "256K" in disk:
++                        dev = disk.split()[0]
++                        check = self.get_command_output(
++                            "dd if=/dev/%s bs=25 count=1" % dev)
++                        if 'metric' in check['output']:
++                            self.add_cmd_output("dd if=/dev/%s bs=256k count=1"
++                                                % dev,
++                                                suggest_filename="virt_\
++                                                        metrics")
++
++# vim: et ts=4 sw=4
+-- 
+1.8.3.1
+
+
+From 8a710151c792a5f8bddba33de29976bb218b6701 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 30 Jun 2015 17:55:58 +0100
+Subject: [PATCH 3/7] [vhostmd] add plugin to the system and virt profiles
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/vhostmd.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sos/plugins/vhostmd.py b/sos/plugins/vhostmd.py
+index 6711945..786a7c1 100644
+--- a/sos/plugins/vhostmd.py
++++ b/sos/plugins/vhostmd.py
+@@ -20,7 +20,7 @@ class vhostmd(Plugin, RedHatPlugin):
+     """
+ 
+     plugin_name = 'vhostmd'
+-    profiles = ['sap']
++    profiles = ['sap', 'virt', 'system']
+ 
+     packages = ['virt-what']
+ 
+-- 
+1.8.3.1
+
+
+From a5824f209c000d1a69ef305dd69f105400de3f4a Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 30 Jun 2015 18:00:28 +0100
+Subject: [PATCH 4/7] [vhostmd] enumerate disks via /sys/block instead of
+ "lsblk -d"
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/vhostmd.py | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/sos/plugins/vhostmd.py b/sos/plugins/vhostmd.py
+index 786a7c1..0a86fb5 100644
+--- a/sos/plugins/vhostmd.py
++++ b/sos/plugins/vhostmd.py
+@@ -13,6 +13,7 @@
+ # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ 
+ from sos.plugins import Plugin, RedHatPlugin
++import os
+ 
+ 
+ class vhostmd(Plugin, RedHatPlugin):
+@@ -31,14 +32,16 @@ class vhostmd(Plugin, RedHatPlugin):
+             return
+ 
+         if "vmware" in vw or "kvm" in vw or "xen" in vw:
+-            # if vm-dump-metrics is installed use it
+             if self.is_installed("vm-dump-metrics"):
++                # if vm-dump-metrics is installed use it
+                 self.add_cmd_output("vm-dump-metrics",
+                                     suggest_filename="virt_metrics")
+             else:
+                 # otherwise use the raw vhostmd disk presented (256k size)
+-                d = self.get_command_output("lsblk -d")
+-                for disk in d['output'].splitlines():
++                sysblock = "/sys/block"
++                if not os.path.isdir(sysblock):
++                    return
++                for disk in os.listdir(sysblock):
+                     if "256K" in disk:
+                         dev = disk.split()[0]
+                         check = self.get_command_output(
+-- 
+1.8.3.1
+
+
+From a191fc379d2ee3b4b42014eec4c3f83a6e423761 Mon Sep 17 00:00:00 2001
+From: Luca Miccini <luca.miccini@redhat.com>
+Date: Tue, 24 Feb 2015 18:40:07 +0100
+Subject: [PATCH 5/7] [sapnw] add SAP NetWeaver plugin
+
+Closes #516.
+
+Signed-off-by: Luca Miccini <luca.miccini@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/sapnw.py | 131 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 131 insertions(+)
+ create mode 100644 sos/plugins/sapnw.py
+
+diff --git a/sos/plugins/sapnw.py b/sos/plugins/sapnw.py
+new file mode 100644
+index 0000000..d2be8dd
+--- /dev/null
++++ b/sos/plugins/sapnw.py
+@@ -0,0 +1,131 @@
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++import os
++from sets import Set
++from sos.plugins import Plugin, RedHatPlugin
++
++
++class sapnw(Plugin, RedHatPlugin):
++    """SAP NetWeaver"""
++
++    files = ['/usr/sap']
++
++    def setup(self):
++
++        # list installed instances
++        self.add_cmd_output("/usr/sap/hostctrl/exe/saphostctrl \
++                            -function ListInstances",
++                            suggest_filename="SAPInstances_List")
++        # list installed sap dbs
++        self.add_cmd_output("/usr/sap/hostctrl/exe/saphostctrl \
++                            -function ListDatabases",
++                            suggest_filename="SAPDatabases_List")
++
++        # list defined instances and guess profiles out of them
++        # (good for HA setups with virtual hostnames)
++        # using sap host control agent
++
++        p = self.get_command_output(
++            "/usr/sap/hostctrl/exe/saphostctrl -function ListInstances")
++
++        sidsunique = Set([])
++
++        # Cycle through all the instances, get 'sid' 'instance_number'
++        # and 'vhost' to determine the proper profile
++        for line in p['output'].splitlines():
++            if "DAA" not in line:
++                fields = line.strip().split()
++                sid = fields[3]
++                inst = fields[5]
++                vhost = fields[7]
++                sidsunique.add(sid)
++                p = os.listdir("/usr/sap/%s/SYS/profile/" % sid)
++                for line in p:
++                    if sid in line and inst in line and vhost in line:
++                        ldenv = 'LD_LIBRARY_PATH=/usr/sap/%s/SYS/exe/run' % sid
++                        pt = '/usr/sap/%s/SYS/exe/uc/linuxx86_64' % sid
++                        profile = line.strip()
++                        self.add_cmd_output(
++                            "env -i %s %s/sappfpar \
++                            all pf=/usr/sap/%s/SYS/profile/%s"
++                            % (ldenv, pt, sid, profile),
++                            suggest_filename="%s_parameters" % profile)
++
++                        # collect instance status
++                        self.add_cmd_output(
++                            "env -i %s %s/sapcontrol -nr %s \
++                            -function GetProcessList" % (ldenv, pt, inst),
++                            suggest_filename="%s_%s_GetProcList" % (sid, inst))
++
++                        # collect version info for the various components
++                        self.add_cmd_output(
++                            "env -i %s %s/sapcontrol -nr %s \
++                            -function GetVersionInfo" % (ldenv, pt, inst),
++                            suggest_filename="%s_%s_GetVersInfo" % (sid, inst))
++
++                        # collect <SID>adm user environment
++                        lowsid = sid.lower()
++                        self.add_cmd_output(
++                            "su - %sadm -c \"sapcontrol -nr %s -function \
++                            GetEnvironment\"" % (lowsid, inst),
++                            suggest_filename="%s_%sadm_%s_userenv"
++                            % (sid, lowsid, inst))
++
++        # traverse the sids list, collecting info about dbclient
++        for sid in sidsunique:
++            c = self.get_command_output("ls /usr/sap/%s/" % sid)
++            for line in c['output'].splitlines():
++                if 'DVEB' in line:
++                    self.add_cmd_output(
++                        "grep 'client driver' /usr/sap/%s/%s/work/dev_w0"
++                        % (sid, line), suggest_filename="%s_dbclient" % sid)
++
++        # get the installed db's
++        d = self.get_command_output(
++            '/usr/sap/hostctrl/exe/saphostctrl -function ListDatabases')
++
++        for line in d['output'].splitlines():
++            if "Instance name" in line:
++                fields = line.strip().split()
++                dbadm = fields[2][:-1]
++                dbtype = fields[8][:-1]
++                sid = dbadm[3:].upper()
++
++                if dbtype == 'db6':
++                    self.add_cmd_output(
++                        "su - %s -c \"db2 get dbm cfg\""
++                        % dbadm, suggest_filename="%s_%s_db2_info"
++                        % (sid, dbadm))
++
++                if dbtype == 'sap':
++                    sid = fields[2][:-1]
++                    self.add_cmd_output(
++                        "cat /sapdb/%s/data/config/%s.pah"
++                        % (sid, sid),
++                        suggest_filename="%s_%s_maxdb_info"
++                        % (sid, dbadm))
++
++                if dbtype == 'ora':
++                    sid = fields[2][:-1]
++                    self.add_cmd_output(
++                        "cat /oracle/%s/*/dbs/init.ora" % sid,
++                        suggest_filename="%s_oracle_init.ora" % sid)
++
++        # if sapconf available run it in check mode
++        if os.path.isfile("/usr/bin/sapconf"):
++            self.add_cmd_output(
++                "/usr/bin/sapconf -n", suggest_filename="sapconf_checkmode")
++
++# vim: et ts=4 sw=4
+-- 
+1.8.3.1
+
+
+From 1d4185aa916703370f605f87341aa74563f06aa5 Mon Sep 17 00:00:00 2001
+From: Luca Miccini <luca.miccini@redhat.com>
+Date: Mon, 2 Mar 2015 12:01:23 +0100
+Subject: [PATCH 6/7] [sapnw] add 'sapnw' as member of the 'sap' profile
+
+Signed-off-by: Luca Miccini <luca.miccini@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/sapnw.py | 74 +++++++++++++++++++++++++++++-----------------------
+ 1 file changed, 41 insertions(+), 33 deletions(-)
+
+diff --git a/sos/plugins/sapnw.py b/sos/plugins/sapnw.py
+index d2be8dd..521556b 100644
+--- a/sos/plugins/sapnw.py
++++ b/sos/plugins/sapnw.py
+@@ -17,46 +17,54 @@ from sets import Set
+ from sos.plugins import Plugin, RedHatPlugin
+ 
+ 
++def get_directory_listing(path):
++    try:
++        dir_list = os.listdir(path)
++    except:
++        dir_list = []
++    return dir_list
++
++
+ class sapnw(Plugin, RedHatPlugin):
+     """SAP NetWeaver"""
+ 
++    plugin_name = 'sapnw'
++    profiles = ['sap']
++
+     files = ['/usr/sap']
+ 
+     def setup(self):
+ 
+         # list installed instances
+-        self.add_cmd_output("/usr/sap/hostctrl/exe/saphostctrl \
+-                            -function ListInstances",
+-                            suggest_filename="SAPInstances_List")
++        inst_out = self.get_cmd_output_now("/usr/sap/hostctrl/exe/saphostctrl \
++                                           -function ListInstances",
++                                           suggest_filename="SAPInstances")
+         # list installed sap dbs
+-        self.add_cmd_output("/usr/sap/hostctrl/exe/saphostctrl \
+-                            -function ListDatabases",
+-                            suggest_filename="SAPDatabases_List")
+-
+-        # list defined instances and guess profiles out of them
+-        # (good for HA setups with virtual hostnames)
+-        # using sap host control agent
+-
+-        p = self.get_command_output(
+-            "/usr/sap/hostctrl/exe/saphostctrl -function ListInstances")
++        db_out = self.get_cmd_output_now("/usr/sap/hostctrl/exe/saphostctrl \
++                                         -function ListDatabases",
++                                         suggest_filename="SAPDatabases")
+ 
+         sidsunique = Set([])
+ 
+         # Cycle through all the instances, get 'sid' 'instance_number'
+         # and 'vhost' to determine the proper profile
+-        for line in p['output'].splitlines():
++        p = open(inst_out, "r").read().splitlines()
++        for line in p:
+             if "DAA" not in line:
+                 fields = line.strip().split()
+                 sid = fields[3]
+                 inst = fields[5]
+                 vhost = fields[7]
+                 sidsunique.add(sid)
+-                p = os.listdir("/usr/sap/%s/SYS/profile/" % sid)
+-                for line in p:
++                for line in get_directory_listing("/usr/sap/%s/SYS/profile/"
++                                                  % sid):
+                     if sid in line and inst in line and vhost in line:
+                         ldenv = 'LD_LIBRARY_PATH=/usr/sap/%s/SYS/exe/run' % sid
++                        # TODO: I am assuming unicode here
++                        # nuc should be accounted
+                         pt = '/usr/sap/%s/SYS/exe/uc/linuxx86_64' % sid
+                         profile = line.strip()
++                        # collect profiles
+                         self.add_cmd_output(
+                             "env -i %s %s/sappfpar \
+                             all pf=/usr/sap/%s/SYS/profile/%s"
+@@ -67,13 +75,15 @@ class sapnw(Plugin, RedHatPlugin):
+                         self.add_cmd_output(
+                             "env -i %s %s/sapcontrol -nr %s \
+                             -function GetProcessList" % (ldenv, pt, inst),
+-                            suggest_filename="%s_%s_GetProcList" % (sid, inst))
++                            suggest_filename="%s_%s_GetProcList"
++                            % (sid, inst))
+ 
+                         # collect version info for the various components
+                         self.add_cmd_output(
+                             "env -i %s %s/sapcontrol -nr %s \
+                             -function GetVersionInfo" % (ldenv, pt, inst),
+-                            suggest_filename="%s_%s_GetVersInfo" % (sid, inst))
++                            suggest_filename="%s_%s_GetVersInfo"
++                            % (sid, inst))
+ 
+                         # collect <SID>adm user environment
+                         lowsid = sid.lower()
+@@ -85,18 +95,18 @@ class sapnw(Plugin, RedHatPlugin):
+ 
+         # traverse the sids list, collecting info about dbclient
+         for sid in sidsunique:
+-            c = self.get_command_output("ls /usr/sap/%s/" % sid)
+-            for line in c['output'].splitlines():
++            for line in get_directory_listing("/usr/sap/%s/" % sid):
+                 if 'DVEB' in line:
+                     self.add_cmd_output(
+                         "grep 'client driver' /usr/sap/%s/%s/work/dev_w0"
+-                        % (sid, line), suggest_filename="%s_dbclient" % sid)
++                        % (sid, line), suggest_filename="%s_dbclient"
++                        % sid)
+ 
+-        # get the installed db's
+-        d = self.get_command_output(
+-            '/usr/sap/hostctrl/exe/saphostctrl -function ListDatabases')
++        if not db_out:
++            return
++        dbl = open(db_out, "r").read().splitlines()
+ 
+-        for line in d['output'].splitlines():
++        for line in dbl:
+             if "Instance name" in line:
+                 fields = line.strip().split()
+                 dbadm = fields[2][:-1]
+@@ -104,24 +114,22 @@ class sapnw(Plugin, RedHatPlugin):
+                 sid = dbadm[3:].upper()
+ 
+                 if dbtype == 'db6':
++                    # IBM DB2
+                     self.add_cmd_output(
+                         "su - %s -c \"db2 get dbm cfg\""
+                         % dbadm, suggest_filename="%s_%s_db2_info"
+                         % (sid, dbadm))
+ 
+                 if dbtype == 'sap':
++                    # SAP MAXDB
+                     sid = fields[2][:-1]
+-                    self.add_cmd_output(
+-                        "cat /sapdb/%s/data/config/%s.pah"
+-                        % (sid, sid),
+-                        suggest_filename="%s_%s_maxdb_info"
+-                        % (sid, dbadm))
++                    self.add_copy_spec(
++                        "/sapdb/%s/data/config/%s.pah" % (sid, sid))
+ 
+                 if dbtype == 'ora':
++                    # Oracle
+                     sid = fields[2][:-1]
+-                    self.add_cmd_output(
+-                        "cat /oracle/%s/*/dbs/init.ora" % sid,
+-                        suggest_filename="%s_oracle_init.ora" % sid)
++                    self.add_copy_spec("/oracle/%s/*/dbs/init.ora" % sid)
+ 
+         # if sapconf available run it in check mode
+         if os.path.isfile("/usr/bin/sapconf"):
+-- 
+1.8.3.1
+
+
+From 5ac02f4fbc38992f23aa1f44974f74f7c4e16ea5 Mon Sep 17 00:00:00 2001
+From: Luca Miccini <luca.miccini@redhat.com>
+Date: Wed, 11 Mar 2015 15:19:49 +0100
+Subject: [PATCH 7/7] [sapnw] add sybase ASE collection
+
+Signed-off-by: Luca Miccini <luca.miccini@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/sapnw.py | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/sos/plugins/sapnw.py b/sos/plugins/sapnw.py
+index 521556b..e18978f 100644
+--- a/sos/plugins/sapnw.py
++++ b/sos/plugins/sapnw.py
+@@ -131,6 +131,11 @@ class sapnw(Plugin, RedHatPlugin):
+                     sid = fields[2][:-1]
+                     self.add_copy_spec("/oracle/%s/*/dbs/init.ora" % sid)
+ 
++                if dbtype == 'syb':
++                    # Sybase
++                    sid = fields[2][:-1]
++                    self.add_copy_spec("/sybase/%s/ASE*/%s.cfg" % (sid, sid))
++
+         # if sapconf available run it in check mode
+         if os.path.isfile("/usr/bin/sapconf"):
+             self.add_cmd_output(
+-- 
+1.8.3.1
+

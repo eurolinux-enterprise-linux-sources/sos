@@ -1,0 +1,74 @@
+From 08f5b211dbbf143b3f3ce5e8328947f01adb86cd Mon Sep 17 00:00:00 2001
+From: Keigo Noha <knoha@redhat.com>
+Date: Wed, 29 Jul 2015 19:44:39 +0900
+Subject: [PATCH] [networking] brctl command is run when bridge kernel module
+ is loaded only
+
+Previously, bridge information were collected even if bridge kernel module were not loaded.
+brctl command requires and loads bridge and related kernel modules to accomplish its purporse.
+This behaviour causes unexpected and unnecessary kernel module loading.
+
+sosreport should not change the system configuration.
+
+This patch will change this behaviour to run brctl command only if bridge module is loaded.
+
+Closes #616
+
+Signed-off-by: Keigo Noha <knoha@redhat.com>
+Signed-off-by: Adam Stokes <adam.stokes@ubuntu.com>
+---
+ sos/plugins/__init__.py   |  7 +++++++
+ sos/plugins/networking.py | 19 ++++++++++++-------
+ 2 files changed, 19 insertions(+), 7 deletions(-)
+
+diff --git a/sos/plugins/__init__.py b/sos/plugins/__init__.py
+index 6731b28..b34c3bb 100644
+--- a/sos/plugins/__init__.py
++++ b/sos/plugins/__init__.py
+@@ -662,6 +662,13 @@ class Plugin(object):
+ 
+         return os.path.join(self.archive.get_archive_path(), outfn)
+ 
++    def is_module_loaded(self, module_name):
++        """Return whether specified moudle as module_name is loaded or not"""
++        if len(grep("^" + module_name + " ", "/proc/modules")) == 0:
++            return None
++        else:
++            return True
++
+     # For adding output
+     def add_alert(self, alertstring):
+         """Add an alert to the collection of alerts for this plugin. These
+diff --git a/sos/plugins/networking.py b/sos/plugins/networking.py
+index f39f126..c7ee76b 100644
+--- a/sos/plugins/networking.py
++++ b/sos/plugins/networking.py
+@@ -191,13 +191,18 @@ class Networking(Plugin):
+                     "ethtool -g "+eth
+                 ])
+ 
+-        brctl_file = self.get_cmd_output_now("brctl show")
+-        if brctl_file:
+-            for br_name in self.get_bridge_name(brctl_file):
+-                self.add_cmd_output([
+-                    "brctl showstp "+br_name,
+-                    "brctl showmacs "+br_name
+-                ])
++        # brctl command will load bridge and related kernel modules
++        # if those modules are not loaded at the time of brctl command running
++        # This behaviour causes an unexpected configuration change for system.
++        # sosreport should aovid such situation.
++        if self.is_module_loaded("bridge"):
++            brctl_file = self.get_cmd_output_now("brctl show")
++            if brctl_file:
++                for br_name in self.get_bridge_name(brctl_file):
++                    self.add_cmd_output([
++                            "brctl showstp "+br_name,
++                            "brctl showmacs "+br_name
++                    ])
+ 
+         if self.get_option("traceroute"):
+             self.add_cmd_output("/bin/traceroute -n %s" % self.trace_host)
+-- 
+1.8.3.1
+

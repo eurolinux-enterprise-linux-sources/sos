@@ -1,0 +1,58 @@
+diff -up sos-3.2/sos/plugins/cluster.py.org sos-3.2/sos/plugins/cluster.py
+--- sos-3.2/sos/plugins/cluster.py.org	2015-05-13 10:09:19.719424649 -0400
++++ sos-3.2/sos/plugins/cluster.py	2015-05-13 10:10:55.399424614 -0400
+@@ -25,10 +25,12 @@ class Cluster(Plugin, RedHatPlugin):
+ 
+     plugin_name = 'cluster'
+     profiles = ('cluster',)
++
+     option_list = [
+         ("gfs2lockdump", 'gather output of gfs2 lockdumps', 'slow', False),
+         ("crm_from", 'specify the start time for crm_report', 'fast', False),
+-        ('lockdump', 'gather dlm lockdumps', 'slow', False)
++        ('lockdump', 'gather dlm lockdumps', 'slow', False),
++        ('crm_scrub', 'enable password scrubbing for crm_report', '', True),
+     ]
+ 
+     packages = [
+@@ -66,7 +68,7 @@ class Cluster(Plugin, RedHatPlugin):
+         ])
+ 
+         if self.get_option('gfs2lockdump'):
+-            if (self._mount_debug()):
++            if self._mount_debug():
+                 self.add_copy_spec(["/sys/kernel/debug/gfs2/*"])
+ 
+         if self.get_option('lockdump'):
+@@ -100,8 +102,8 @@ class Cluster(Plugin, RedHatPlugin):
+ 
+         # crm_report needs to be given a --from "YYYY-MM-DD HH:MM:SS" start
+         # time in order to collect data.
+-        crm_from = (datetime.today()
+-                    - timedelta(hours=72)).strftime("%Y-%m-%d %H:%m:%S")
++        crm_from = (datetime.today() -
++                    timedelta(hours=72)).strftime("%Y-%m-%d %H:%m:%S")
+         if self.get_option('crm_from') is not False:
+             if re.match(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
+                         str(self.get_option('crm_from'))):
+@@ -112,11 +114,17 @@ class Cluster(Plugin, RedHatPlugin):
+                     "default" % self.get_option('crm_from'))
+ 
+         crm_dest = self.get_cmd_output_path(name='crm_report', make=False)
+-        self.add_cmd_output('crm_report -S -d --dest %s --from "%s"'
+-                            % (crm_dest, crm_from))
++        crm_scrub = '-p "passw.*"'
++        if not self.get_option("crm_scrub"):
++            crm_scrub = ''
++            self._log_warn("scrubbing of crm passwords has been disabled:")
++            self._log_warn("data collected by crm_report may contain"
++                           " sensitive values.")
++        self.add_cmd_output('crm_report %s -S -d --dest %s --from "%s"'
++                            % (crm_scrub, crm_dest, crm_from))
+ 
+     def do_lockdump(self):
+-        if (self._mount_debug()):
++        if self._mount_debug():
+             dlm_tool = "dlm_tool ls"
+             result = self.call_ext_prog(dlm_tool)
+             if result['status'] != 0:

@@ -1,0 +1,65 @@
+From 79984402303b01c81eb5a6825350d030e4022edd Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Tue, 20 Jan 2015 11:33:31 -0500
+Subject: [PATCH] [puppet] Adding new plugin for puppet - rhbz #1183768
+
+ Added a new plugin to collect files for puppet.
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/puppet.py |   43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 43 insertions(+), 0 deletions(-)
+ create mode 100644 sos/plugins/puppet.py
+
+diff --git a/sos/plugins/puppet.py b/sos/plugins/puppet.py
+new file mode 100644
+index 0000000..1ba3173
+--- /dev/null
++++ b/sos/plugins/puppet.py
+@@ -0,0 +1,43 @@
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++from sos.plugins import Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin
++from glob import glob
++
++class Puppet(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
++    """Puppet service
++    """
++
++    plugin_name = 'puppet'
++    profiles = ('services',)
++
++    def setup(self):
++        self.add_copy_spec([
++            "/etc/puppet/*.conf",
++            "/etc/puppet/rack/*",
++            "/etc/puppet/manifests/*",
++            "/var/log/puppet/*.log",
++        ])
++
++
++    def postproc(self):
++        for device_conf in glob("/etc/puppet/device.conf*"):
++            self.do_file_sub(
++                device_conf,
++                r"(.*url*.ssh://.*:).*(@.*)",
++                r"\1%s\2" % ('***')
++            )
++
++        return
++# vim: et ts=4 sw=4
+-- 
+1.7.1
+

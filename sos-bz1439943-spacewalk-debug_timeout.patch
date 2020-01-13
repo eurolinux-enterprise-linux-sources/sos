@@ -1,0 +1,31 @@
+From 074efd184a975346990761af72cbd8c077844b41 Sat Apr 08 00:00:00 2017
+From: Marcelo Moreira de Mello <mmello@redhat.com>
+Date: Sat, 08 Apr 2017 22:27:11 +0100
+Subject: [PATCH] [satellite] increase timeout of spacewalk-debug to 15minutes
+
+spacewalk-debug usually runs longer than the default 5 minutes timeout.
+
+Resolves: #989
+
+Signed-off-by: Marcelo Moreira de Mello <mmello@redhat.com>
+---
+ /sos/plugins/satellite.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/sos/plugins/satellite.py b/sos/plugins/satellite.py
+index fef2f14..ca0565b 100644
+--- a/sos/plugins/satellite.py
++++ b/sos/plugins/satellite.py
+@@ -81,7 +81,8 @@ class Satellite(Plugin, RedHatPlugin):
+             ])
+             self.add_cmd_output(
+                 "spacewalk-debug --dir %s"
+-                % self.get_cmd_output_path(name="spacewalk-debug"))
++                % self.get_cmd_output_path(name="spacewalk-debug"),
++                timeout=900)
+ 
+         if self.proxy:
+             self.add_copy_spec(["/etc/squid", "/var/log/squid"])
+-- 
+1.7.1
+

@@ -1,0 +1,67 @@
+From 8b49485153cc7dc03cd974dbc3a100c81ef04720 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Mon, 19 Jan 2015 19:40:06 +0000
+Subject: [PATCH] [sosreport] log plugin exceptions to a file
+
+Add exception logging for the Plugin.postproc() method and move
+plugin exceptions into a separate per-plugin log file. This is
+less cluttered than pushing a multi-line traceback through the
+soslog.error logger and matches the behaviour of older releases.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/sosreport.py | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index 3c0397c..f17194a 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -1071,8 +1071,14 @@ class SoSReport(object):
+                 self.ui_log.info("")
+                 self._exit()
+ 
+-    def _log_plugin_exception(self, plugin_name):
+-        self.soslog.error("%s\n%s" % (plugin_name, traceback.format_exc()))
++    def _log_plugin_exception(self, plugin, method):
++        trace = traceback.format_exc()
++        msg = "caught exception in plugin method"
++        plugin_err_log = "%s-plugin-errors.txt" % plugin
++        logpath = os.path.join(self.logdir, plugin_err_log)
++        self.soslog.error('%s "%s.%s()"' % (msg, plugin, method))
++        self.soslog.error('writing traceback to %s' % logpath)
++        self.archive.add_string("%s\n" % trace, logpath)
+ 
+     def prework(self):
+         self.policy.pre_work()
+@@ -1129,7 +1135,7 @@ class SoSReport(object):
+                 if self.raise_plugins:
+                     raise
+                 else:
+-                    self._log_plugin_exception(plugname)
++                    self._log_plugin_exception(plugname, "setup")
+ 
+     def version(self):
+         """Fetch version information from all plugins and store in the report
+@@ -1175,7 +1181,7 @@ class SoSReport(object):
+                 if self.raise_plugins:
+                     raise
+                 else:
+-                    self._log_plugin_exception(plugname)
++                    self._log_plugin_exception(plugname, "collect")
+         self.ui_log.info("")
+ 
+     def report(self):
+@@ -1321,6 +1327,9 @@ class SoSReport(object):
+             except:
+                 if self.raise_plugins:
+                     raise
++                else:
++                    self._log_plugin_exception(plugname, "postproc")
++
+ 
+     def final_work(self):
+         # this must come before archive creation to ensure that log
+-- 
+1.9.3
+

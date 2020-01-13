@@ -1,0 +1,31 @@
+From a7a2dd8eb1791257f80fd2ae2993b06472690aea Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Wed, 13 Jan 2016 10:57:59 +0000
+Subject: [PATCH] [sosreport] report correct final path with --build
+
+Ensure the correct path (in the system temporary directory) is
+reported when the --build option is used.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/sosreport.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index bc7792a..f61ea4a 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -1496,7 +1496,9 @@ class SoSReport(object):
+             directory = self.archive.get_archive_path()
+             dir_name = os.path.basename(directory)
+             try:
+-                os.rename(directory, os.path.join(self.sys_tmp, dir_name))
++                final_dir = os.path.join(self.sys_tmp, dir_name)
++                os.rename(directory, final_dir)
++                directory = final_dir
+             except (OSError, IOError):
+                     print(_("Error moving directory: %s" % directory))
+                     return False
+-- 
+1.8.3.1
+

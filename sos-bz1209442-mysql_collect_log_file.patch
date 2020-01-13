@@ -1,0 +1,37 @@
+From f8ab86cbd2302812cd9160bec4478cb4f84e1442 Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Mon, 27 Apr 2015 10:28:34 -0400
+Subject: [PATCH] [mysql] Collect log file
+
+When MariaDB is run under Pacemaker an OCF resource agent is used
+to start and stop the database. This configuration also overrides
+the log paths used for the database. In particular the mysqld.log
+is present at '/var/log/mysqld.log'.
+
+Collect both paths as we do not currently detect whether we are
+running with an OCF agent or stand-alone.
+
+Fixes: #554
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/mysql.py |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/sos/plugins/mysql.py b/sos/plugins/mysql.py
+index 8dba204..aa8e9b9 100644
+--- a/sos/plugins/mysql.py
++++ b/sos/plugins/mysql.py
+@@ -37,6 +37,8 @@ class Mysql(Plugin):
+ 
+         self.add_copy_spec([
+             self.mysql_cnf,
++            # Required for MariaDB under pacemaker (MariaDB-Galera)
++            "/var/log/mysqld.log",
+             "/var/log/mysql/mysqld.log",
+             "/var/log/mariadb/mariadb.log",
+         ])
+-- 
+1.7.1
+

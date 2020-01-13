@@ -1,0 +1,153 @@
+From 24fb011755e655127b7e09f4c02275539666b4b2 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Wed, 29 Jul 2015 14:47:19 +0200
+Subject: [PATCH] [sapnw] uses a deprecated Sets module
+
+Use built-in set class instead of deprecated Set for sidsunique
+
+Resolves: #608
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+Signed-off-by: Adam Stokes <adam.stokes@ubuntu.com>
+---
+ sos/plugins/sapnw.py | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/sos/plugins/sapnw.py b/sos/plugins/sapnw.py
+index e18978f..59beff2 100644
+--- a/sos/plugins/sapnw.py
++++ b/sos/plugins/sapnw.py
+@@ -13,7 +13,6 @@
+ # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ 
+ import os
+-from sets import Set
+ from sos.plugins import Plugin, RedHatPlugin
+ 
+ 
+@@ -44,7 +43,7 @@ class sapnw(Plugin, RedHatPlugin):
+                                          -function ListDatabases",
+                                          suggest_filename="SAPDatabases")
+ 
+-        sidsunique = Set([])
++        sidsunique = set()
+ 
+         # Cycle through all the instances, get 'sid' 'instance_number'
+         # and 'vhost' to determine the proper profile
+-- 
+1.8.3.1
+
+From 10059897ceb0755bab844011f11ea6c6af8794ae Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Tue, 28 Jul 2015 13:50:54 +0200
+Subject: [PATCH] [sapnw] Add check if saphostctrl is not present
+
+Split listing&collecting instances and dbs from lengthy setup().
+
+Break execution when "inst_out = self.get_cmd_output_now" returns None.
+
+db_out is already checked this way.
+
+Resolves: #614
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/sapnw.py | 30 +++++++++++++++++-------------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
+
+diff --git a/sos/plugins/sapnw.py b/sos/plugins/sapnw.py
+index 59beff2..d2c93ec 100644
+--- a/sos/plugins/sapnw.py
++++ b/sos/plugins/sapnw.py
+@@ -32,20 +32,16 @@ class sapnw(Plugin, RedHatPlugin):
+ 
+     files = ['/usr/sap']
+ 
+-    def setup(self):
+-
++    def collect_list_instances(self):
+         # list installed instances
+         inst_out = self.get_cmd_output_now("/usr/sap/hostctrl/exe/saphostctrl \
+                                            -function ListInstances",
+                                            suggest_filename="SAPInstances")
+-        # list installed sap dbs
+-        db_out = self.get_cmd_output_now("/usr/sap/hostctrl/exe/saphostctrl \
+-                                         -function ListDatabases",
+-                                         suggest_filename="SAPDatabases")
++        if not inst_out:
++            return
+ 
+         sidsunique = set()
+-
+-        # Cycle through all the instances, get 'sid' 'instance_number'
++        # Cycle through all the instances, get 'sid', 'instance_number'
+         # and 'vhost' to determine the proper profile
+         p = open(inst_out, "r").read().splitlines()
+         for line in p:
+@@ -101,10 +97,15 @@ class sapnw(Plugin, RedHatPlugin):
+                         % (sid, line), suggest_filename="%s_dbclient"
+                         % sid)
+ 
++    def collect_list_dbs(self):
++        # list installed sap dbs
++        db_out = self.get_cmd_output_now("/usr/sap/hostctrl/exe/saphostctrl \
++                                         -function ListDatabases",
++                                         suggest_filename="SAPDatabases")
+         if not db_out:
+             return
+-        dbl = open(db_out, "r").read().splitlines()
+ 
++        dbl = open(db_out, "r").read().splitlines()
+         for line in dbl:
+             if "Instance name" in line:
+                 fields = line.strip().split()
+@@ -135,9 +136,12 @@ class sapnw(Plugin, RedHatPlugin):
+                     sid = fields[2][:-1]
+                     self.add_copy_spec("/sybase/%s/ASE*/%s.cfg" % (sid, sid))
+ 
+-        # if sapconf available run it in check mode
+-        if os.path.isfile("/usr/bin/sapconf"):
+-            self.add_cmd_output(
+-                "/usr/bin/sapconf -n", suggest_filename="sapconf_checkmode")
++    def setup(self):
++        collect_list_instances()
++        collect_list_dbs()
++
++        # run sapconf in check mode
++        self.add_cmd_output("sapconf -n",
++                            suggest_filename="sapconf_checkmode")
+ 
+ # vim: et ts=4 sw=4
+-- 
+1.8.3.1
+
+From 1f83971325629cb3f470dac74de1be49f095118e Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Tue, 4 Aug 2015 10:44:37 +0200
+Subject: [PATCH] [sapnw] call self methods properly
+
+Call methods from the self class within "self." scope.
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/sapnw.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/sapnw.py b/sos/plugins/sapnw.py
+index d2c93ec..be8c4b9 100644
+--- a/sos/plugins/sapnw.py
++++ b/sos/plugins/sapnw.py
+@@ -137,8 +137,8 @@ class sapnw(Plugin, RedHatPlugin):
+                     self.add_copy_spec("/sybase/%s/ASE*/%s.cfg" % (sid, sid))
+ 
+     def setup(self):
+-        collect_list_instances()
+-        collect_list_dbs()
++        self.collect_list_instances()
++        self.collect_list_dbs()
+ 
+         # run sapconf in check mode
+         self.add_cmd_output("sapconf -n",
+-- 
+1.8.3.1
+

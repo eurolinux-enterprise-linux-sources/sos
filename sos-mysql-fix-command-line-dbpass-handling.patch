@@ -1,0 +1,39 @@
+From db9ac3fb615b731be87b4116a8939105bf5ced56 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 23 Dec 2014 14:40:50 +0000
+Subject: [PATCH] [mysql] fix command-line dbpass handling
+
+The logic for chosing between a command-line and environment
+variable passed password in the MySQL plugin was incorrect. This
+prevents a database dump from being collected when a password is
+given on the command line.
+
+Altough use of the command line to pass authentication tokens
+is discouraged we should ensure the case works.
+
+Fixes #456.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/mysql.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/mysql.py b/sos/plugins/mysql.py
+index d148472..edab6d0 100644
+--- a/sos/plugins/mysql.py
++++ b/sos/plugins/mysql.py
+@@ -45,9 +45,9 @@ class Mysql(Plugin):
+         if self.get_option("dbdump"):
+             dbuser = self.get_option("dbuser")
+             dbpass = self.get_option("dbpass")
+-            if dbpass is False and 'MYSQL_PWD' in os.environ:
++            if 'MYSQL_PWD' in os.environ:
+                 dbpass = os.environ['MYSQL_PWD']
+-            else:
++            if not dbpass or dbpass is False:
+                 # no MySQL password
+                 return
+             os.environ['MYSQL_PWD'] = dbpass
+-- 
+1.9.3
+

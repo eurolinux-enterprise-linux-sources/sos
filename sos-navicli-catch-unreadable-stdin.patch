@@ -1,0 +1,42 @@
+From 465746d768ce69684eee57eaa3509d9ae898fee2 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Wed, 17 Dec 2014 12:39:05 +0000
+Subject: [PATCH] [navicli] catch exception if input is unreadable
+
+CLARiiON SP IP Address or [Enter] to exit: Traceback (most recent call last):
+  File "/usr/sbin/sosreport", line 25, in <module>
+    main(sys.argv[1:])
+  File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1408, in main
+    sos.execute()
+  File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1387, in execute
+    self.setup()
+  File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1117, in setup
+    plug.setup()
+  File "/usr/lib/python2.7/site-packages/sos/plugins/navicli.py", line 72, in setup
+    ans = input("CLARiiON SP IP Address or [Enter] to exit: ")
+EOFError: EOF when reading a line
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/navicli.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/sos/plugins/navicli.py b/sos/plugins/navicli.py
+index 5175f89..3ee7d50 100644
+--- a/sos/plugins/navicli.py
++++ b/sos/plugins/navicli.py
+@@ -69,7 +69,10 @@ class Navicli(Plugin, RedHatPlugin):
+         CLARiiON_IP_address_list = []
+         CLARiiON_IP_loop = "stay_in"
+         while CLARiiON_IP_loop == "stay_in":
+-            ans = input("CLARiiON SP IP Address or [Enter] to exit: ")
++            try:
++                ans = input("CLARiiON SP IP Address or [Enter] to exit: ")
++            except:
++                return
+             if self.check_ext_prog("navicli -h %s getsptime" % (ans,)):
+                 CLARiiON_IP_address_list.append(ans)
+             else:
+-- 
+1.9.3
+

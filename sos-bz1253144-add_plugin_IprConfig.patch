@@ -1,0 +1,222 @@
+From ab55d60518e3885b73de0f2a3d6258f38d956ab4 Mon Sep 17 00:00:00 2001
+From: Kamalesh Babulal <kamalesh@linux.vnet.ibm.com>
+Date: Mon, 6 Jul 2015 11:55:13 +0100
+Subject: [PATCH] [plugin] fix recursive symlink handling
+
+A symbolic link that points to itself may exist in paths encountered
+as part of a copyspec. For a normal symlink the link target is added
+to the set of paths to collect. For a link pointing to itself, we end
+up in recursive loop. Avoid this by skipping the path collection for
+the target in the case that the canonicalized target and link path
+are equal.
+
+For example:
+total 0
+0 lrwxrwxrwx. 1 root root 14 May 18 09:22 default.xml -> ../default.xml
+0 lrwxrwxrwx. 1 root root  7 May 22 05:37 kop.xml -> kop.xml
+
+Trying to copying such symlink, will ends up in following exception:
+Traceback (most recent call last):
+  File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1172,
+in collect
+    plug.collect()
+  File "/usr/lib/python2.7/site-packages/sos/plugins/__init__.py", line
+630, in collect
+    self._collect_copy_specs()
+  File "/usr/lib/python2.7/site-packages/sos/plugins/__init__.py", line
+600, in _collect_copy_specs
+    self._do_copy_path(path)
+  File "/usr/lib/python2.7/site-packages/sos/plugins/__init__.py", line
+319, in _do_copy_path
+    self._copy_symlink(srcpath)
+  File "/usr/lib/python2.7/site-packages/sos/plugins/__init__.py", line
+271, in _copy_symlink
+    self._do_copy_path(absdest)
+  File "/usr/lib/python2.7/site-packages/sos/plugins/__init__.py", line
+319, in _do_copy_path
+    self._copy_symlink(srcpath)
+  File "/usr/lib/python2.7/site-packages/sos/plugins/__init__.py", line
+261, in _copy_symlink
+    self.archive.add_link(reldest, srcpath)
+  File "/usr/lib/python2.7/site-packages/sos/archive.py", line 198, in
+add_link
+    os.symlink(source, dest)
+OSError: [Errno 17] File exists
+
+Fix this recursive loop but just creating the link and skip copying
+the symlink.
+
+Signed-off-by: Kamalesh Babulal <kamalesh@linux.vnet.ibm.com>
+(minor edits to debug and commit message)
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+v2:
+  - Create the link and skip copying, if both src and dest are same.
+  - Append the symlink to files, copied list.
+
+v1:
+   Initial version: Returns, if the source path does not exist.
+
+ sos/plugins/__init__.py | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+---
+ sos/plugins/__init__.py | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/sos/plugins/__init__.py b/sos/plugins/__init__.py
+index e50e0d3..21e0186 100644
+--- a/sos/plugins/__init__.py
++++ b/sos/plugins/__init__.py
+@@ -268,7 +268,13 @@ class Plugin(object):
+         # to absolute paths to pass to _do_copy_path.
+         self._log_debug("normalized link target '%s' as '%s'"
+                         % (linkdest, absdest))
+-        self._do_copy_path(absdest)
++
++        # skip recursive copying of symlink pointing to itself.
++        if (absdest != srcpath):
++            self._do_copy_path(absdest)
++        else:
++            self._log_debug("link '%s' points to itself, skipping target..."
++                            % linkdest)
+ 
+         self.copied_files.append({'srcpath': srcpath,
+                                   'dstpath': srcpath,
+-- 
+1.8.3.1
+
+From ad464fcc0882f8764e8bbb091a91eeeb4a804ff3 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Mon, 15 Dec 2014 17:30:24 +0000
+Subject: [PATCH] [iprconfig] add plugin for IBM Power RAID adapters
+
+Capture information which helps in better understanding of
+IBM Power RAID storage adapter configuration. Since iprconfig
+is specific to power adding the relevant commands in powerpc plugin.
+
+Signed-off-by: Aruna Balakrishnaiah <aruna@linux.vnet.ibm.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/iprconfig.py | 110 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
+ create mode 100644 sos/plugins/iprconfig.py
+
+diff --git a/sos/plugins/iprconfig.py b/sos/plugins/iprconfig.py
+new file mode 100644
+index 0000000..b77c192
+--- /dev/null
++++ b/sos/plugins/iprconfig.py
+@@ -0,0 +1,110 @@
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++
++# This plugin enables collection of logs for Power systems
++
++import os
++import re
++from sos.plugins import Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin
++from sos.utilities import is_executable
++
++
++class IprConfig(Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin):
++    """IBM Power RAID storage adapter configuration information
++    """
++
++    plugin_name = 'iprconfig'
++
++    def check_enabled(self):
++        arch = self.policy().get_arch()
++        return arch == "ppc64" and is_executable("iprconfig")
++
++    def setup(self):
++        self.add_cmd_output([
++            "iprconfig -c show-config",
++            "iprconfig -c show-alt-config",
++            "iprconfig -c show-arrays",
++            "iprconfig -c show-jbod-disks",
++            "iprconfig -c show-ioas",
++        ])
++
++        show_ioas = self.call_ext_prog("iprconfig -c show-ioas")
++        if not show_ioas['status'] == 0:
++            return
++
++        devices = []
++        if show_ioas['output']:
++            p = re.compile('sg')
++            for line in show_ioas['output'].splitlines():
++                temp = line.split(' ')
++                # temp[0] holds the device name
++                if p.search(temp[0]):
++                    devices.append(temp[0])
++
++        for device in devices:
++            self.add_cmd_output("iprconfig -c show-details %s" % (device,))
++
++        # Look for IBM Power RAID enclosures (iprconfig lists them)
++        show_config = self.call_ext_prog("iprconfig -c show-config")
++        if not show_config['status'] == 0:
++            return
++
++        if not show_config['output']:
++            return
++
++# iprconfig -c show-config
++# Name   PCI/SCSI Location         Description               Status
++# ------ ------------------------- ------------------------- -----------------
++#        0005:60:00.0/0:            PCI-E SAS RAID Adapter    Operational
++# sda    0005:60:00.0/0:0:0:0       Physical Disk             Active
++# sdb    0005:60:00.0/0:1:0:0       Physical Disk             Active
++# sdc    0005:60:00.0/0:2:0:0       Physical Disk             Active
++# sdd    0005:60:00.0/0:3:0:0       Physical Disk             Active
++# sde    0005:60:00.0/0:4:0:0       Physical Disk             Active
++# sdf    0005:60:00.0/0:5:0:0       Physical Disk             Active
++#        0005:60:00.0/0:8:0:0       Enclosure                 Active
++#        0005:60:00.0/0:8:1:0       Enclosure                 Active
++
++        show_alt_config = "iprconfig -c show-alt-config"
++        altconfig = self.call_ext_prog(show_alt_config)
++        if not (altconfig['status'] == 0):
++            return
++
++        if not altconfig['output']:
++            return
++
++# iprconfig -c show-alt-config
++# Name   Resource Path/Address      Vendor   Product ID       Status
++# ------ -------------------------- -------- ---------------- -----------------
++# sg9    0:                         IBM      57C7001SISIOA    Operational
++# sg0    0:0:0:0                    IBM      MBF2300RC        Active
++# sg1    0:1:0:0                    IBM      MBF2300RC        Active
++# sg2    0:2:0:0                    IBM      HUC106030CSS600  Active
++# sg3    0:3:0:0                    IBM      HUC106030CSS600  Active
++# sg4    0:4:0:0                    IBM      HUC106030CSS600  Active
++# sg5    0:5:0:0                    IBM      HUC106030CSS600  Active
++# sg7    0:8:0:0                    IBM      VSBPD6E4A  3GSAS Active
++# sg8    0:8:1:0                    IBM      VSBPD6E4B  3GSAS Active
++
++        for line in show_config['output'].splitlines():
++            if "Enclosure" in line:
++                temp = re.split('\s+', line)
++                # temp[1] holds the PCI/SCSI location
++                pci, scsi = temp[1].split('/')
++                for line in altconfig['output'].splitlines():
++                    if scsi in line:
++                        temp = line.split(' ')
++                        # temp[0] holds device name
++                        self.add_cmd_output("iprconfig -c "
++                                            "query-ses-mode %s" % (temp[0],))
+-- 
+1.8.3.1
+

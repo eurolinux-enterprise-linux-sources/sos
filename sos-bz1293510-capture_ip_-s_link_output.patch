@@ -1,0 +1,29 @@
+From 7f0f6366e33b0b6926508330c70695a6efa0ac3b Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Mon, 4 Jan 2016 09:12:02 +0100
+Subject: [PATCH] [networking] get summary of traffic per interface (ip -s
+ link)
+
+Resolves: #712, #714
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/networking.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sos/plugins/networking.py b/sos/plugins/networking.py
+index dd377b4..1004aa2 100644
+--- a/sos/plugins/networking.py
++++ b/sos/plugins/networking.py
+@@ -149,7 +149,7 @@ class Networking(Plugin):
+             "ip -6 route show table all",
+             "ip -4 rule",
+             "ip -6 rule",
+-            "ip link",
++            "ip -s link",
+             "ip address",
+             "ifenslave -a",
+             "ip mroute show",
+-- 
+1.8.3.1
+

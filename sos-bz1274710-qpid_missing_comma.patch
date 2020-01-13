@@ -1,0 +1,32 @@
+From 5e02bb46cc1cddf7ccba27ff05a8702e806ad30d Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Mon, 31 Aug 2015 12:55:58 +0200
+Subject: [PATCH] [qpid] Fix missing commas in add_cmd_output
+
+Commands "qpid-config exchanges" and "qpid-config queues" lack comma in
+the list. That causes the commands are not collected by sosreport and
+executed.
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/qpid.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/qpid.py b/sos/plugins/qpid.py
+index 96ee6d6..319c458 100644
+--- a/sos/plugins/qpid.py
++++ b/sos/plugins/qpid.py
+@@ -34,8 +34,8 @@ class Qpid(Plugin, RedHatPlugin):
+             "qpid-stat -q",
+             "qpid-stat -u",
+             "qpid-stat -m",  # applies since 0.18 version
+-            "qpid-config exchanges"
+-            "qpid-config queues"
++            "qpid-config exchanges",
++            "qpid-config queues",
+             "qpid-config exchanges -b",  # applies to pre-0.18 versions
+             "qpid-config queues -b",  # applies to pre-0.18 versions
+             "qpid-config exchanges -r",  # applies since 0.18 version
+-- 
+1.8.3.1
+

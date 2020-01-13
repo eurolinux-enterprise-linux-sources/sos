@@ -1,0 +1,71 @@
+From 95bb5df9eda253afed15fa81340d31e03c40fe94 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 13 Jan 2015 17:10:06 +0000
+Subject: [PATCH] [sosreport] catch OSError exceptions in SoSReport.execute()
+
+OSError exceptions during logging setup and tear down are not
+currently handled:
+
+  Traceback (most recent call last):
+    File "/usr/sbin/sosreport", line 25, in <module>
+      main(sys.argv[1:])
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1409, in main
+      sos.execute()
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1366, in execute
+      self._setup_logging()
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 739, in _setup_logging
+      self.sos_log_file = self.get_temp_file()
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 670, in get_temp_file
+      return self.tempfile_util.new()
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 82, in new
+      fd, fname = tempfile.mkstemp(dir=self.tmp_dir)
+    File "/usr/lib64/python2.7/tempfile.py", line 304, in mkstemp
+      return _mkstemp_inner(dir, prefix, suffix, flags)
+    File "/usr/lib64/python2.7/tempfile.py", line 239, in _mkstemp_inner
+      fd = _os.open(file, flags, 0600)
+  OSError: [Errno 28] No space left on device: '/tmp/tmp.4ejNitjwcr/nospace_tmp/tmpBjPTOm'
+
+Address this by adding OSError to the list of caught exceptions
+in the main SoSReport.execute() method. Wrap the exception branch
+clean up in a try/except block to catch additional exceptions
+while attempting to clean up (e.g. unlink failures following an
+EROFS on the temporary archive path).
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/sosreport.py | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index 0dd26ad..2a16555 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -1395,12 +1395,19 @@ class SoSReport(object):
+             self.version()
+ 
+             return self.final_work()
+-        except (SystemExit, KeyboardInterrupt):
+-            if self.archive:
+-                self.archive.cleanup()
+-            if self.tempfile_util:
+-                self.tempfile_util.clean()
+-            return False
++
++        except (OSError, SystemExit, KeyboardInterrupt):
++            try:
++                # archive and tempfile cleanup may fail due to a fatal
++                # OSError exception (ENOSPC, EROFS etc.).
++                if self.archive:
++                    self.archive.cleanup()
++                if self.tempfile_util:
++                    self.tempfile_util.clean()
++            except:
++                pass
++
++        return False
+ 
+ 
+ def main(args):
+-- 
+1.9.3
+

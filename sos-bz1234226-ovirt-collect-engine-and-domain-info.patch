@@ -1,0 +1,36 @@
+From ae98e1e119d2abfe771cfa6c286e2e4e177d86d7 Mon Sep 17 00:00:00 2001
+From: Jake Hunsaker <jhunsake@redhat.com>
+Date: Tue, 16 Dec 2014 11:26:50 -0500
+Subject: [PATCH] [ovirt] Collect engine tunables and domain information.
+
+Currently sos does not capture engine-config values or domain information.
+We should capture both of these as the tunables can help in troubleshooting.
+
+Similarly the domain information can help track AD/IPA issues.
+
+These can currently be dug out from the DB dump, however having them in a plaintext
+file makes checking these much faster and easier, and a DB is not always available.
+
+Signed-off-by: Jake Hunsaker <jhunsake@redhat.com>
+Signed-off-by: Adam Stokes <adam.stokes@ubuntu.com>
+---
+ sos/plugins/ovirt.py |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/sos/plugins/ovirt.py b/sos/plugins/ovirt.py
+index b097d93..9436ac6 100644
+--- a/sos/plugins/ovirt.py
++++ b/sos/plugins/ovirt.py
+@@ -83,6 +83,9 @@ class Ovirt(Plugin, RedHatPlugin):
+ 
+         self.add_forbidden_path('/etc/ovirt-engine/.pgpass')
+         self.add_forbidden_path('/etc/rhevm/.pgpass')
++        # Copy all engine tunables and domain information
++        self.add_cmd_output("engine-config --all")
++        self.add_cmd_output("engine-manage-domains list")
+         # Copy engine config files.
+         self.add_copy_spec([
+             "/etc/ovirt-engine",
+-- 
+1.7.1
+

@@ -1,0 +1,39 @@
+From 361d663d7d99b02186c3b47bf144f55c7080198f Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Thu, 23 Feb 2017 17:53:17 +0100
+Subject: [PATCH] [policies] get package list without a timeout
+
+Package list shall never timeout, otherwise pkgs gets empty, causing
+KeyError later on.
+
+Resolves: #942
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/policies/__init__.py |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/sos/policies/__init__.py b/sos/policies/__init__.py
+index af8ed75..a641e45 100644
+--- a/sos/policies/__init__.py
++++ b/sos/policies/__init__.py
+@@ -55,7 +55,6 @@ class PackageManager(object):
+     """
+ 
+     query_command = None
+-    timeout = 30
+ 
+     def __init__(self, query_command=None):
+         self.packages = {}
+@@ -99,7 +98,7 @@ class PackageManager(object):
+                           version': 'major.minor.version'}}
+         """
+         if self.query_command:
+-            pkg_list = shell_out(self.query_command, self.timeout).splitlines()
++            pkg_list = shell_out(self.query_command, timeout=0).splitlines()
+             for pkg in pkg_list:
+                 if '|' not in pkg:
+                     continue
+-- 
+1.7.1
+

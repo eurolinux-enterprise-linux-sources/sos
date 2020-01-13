@@ -1,0 +1,35 @@
+From 61a5b47d4fe4fd47e759b9acc19483491ec17005 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Tue, 5 May 2015 13:50:55 +0200
+Subject: [PATCH] [hpasm] hpasmcli commands hang under timeout
+
+When hpasmcli is run in a python Popen or system pipeline via the
+timeout command it hangs indefinitely.
+
+Work around this temporarily by disabling the use of the timeout
+program (by passing a zero timeout value) when running this
+command.
+
+Fixes: #559
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/hpasm.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sos/plugins/hpasm.py b/sos/plugins/hpasm.py
+index 4d5d158..4d70887 100644
+--- a/sos/plugins/hpasm.py
++++ b/sos/plugins/hpasm.py
+@@ -30,6 +30,6 @@ class Hpasm(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
+         self.add_cmd_output([
+             "hpasmcli -s 'show asr'",
+             "hpasmcli -s 'show server'"
+-        ])
++        ], timeout=0)
+ 
+ # vim: et ts=4 sw=4
+-- 
+1.8.3.1
+

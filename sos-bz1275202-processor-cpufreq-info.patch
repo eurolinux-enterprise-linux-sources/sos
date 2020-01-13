@@ -1,0 +1,29 @@
+From 384e0c432a09f092ff5062dc74dc9389adef5d67 Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Mon, 7 Mar 2016 12:56:04 -0500
+Subject: [PATCH] [processor] Capture output of the command "cpufreq-info"
+
+Fixes: #790
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/processor.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/sos/plugins/processor.py b/sos/plugins/processor.py
+index f8e728c..e69f404 100644
+--- a/sos/plugins/processor.py
++++ b/sos/plugins/processor.py
+@@ -35,7 +35,8 @@ class Processor(Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin):
+             "lscpu",
+             "cpupower info",
+             "cpupower idle-info",
+-            "cpupower frequency-info"
++            "cpupower frequency-info",
++            "cpufreq-info"
+         ])
+ 
+         if '86' in self.policy().get_arch():
+-- 
+1.8.3.1
+

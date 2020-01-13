@@ -1,0 +1,120 @@
+From f9c0cbb953a23037cd98b6f6c28abe085bbcfacd Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Fri, 27 Mar 2015 16:15:37 +0100
+Subject: [PATCH] [satellite] remove explicit gathering of Tomcat info
+
+Resolves #413.
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/satellite.py | 4 +---
+ sos/plugins/tomcat.py    | 2 +-
+ 2 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/sos/plugins/satellite.py b/sos/plugins/satellite.py
+index feace66..fef2f14 100644
+--- a/sos/plugins/satellite.py
++++ b/sos/plugins/satellite.py
+@@ -77,9 +77,7 @@ class Satellite(Plugin, RedHatPlugin):
+         if self.satellite:
+             self.add_copy_spec([
+                 "/etc/tnsnames.ora",
+-                "/etc/jabberd",
+-                "/etc/tomcat6/",
+-                "/var/log/tomcat6/"
++                "/etc/jabberd"
+             ])
+             self.add_cmd_output(
+                 "spacewalk-debug --dir %s"
+diff --git a/sos/plugins/tomcat.py b/sos/plugins/tomcat.py
+index 4f78c1d..10a634e 100644
+--- a/sos/plugins/tomcat.py
++++ b/sos/plugins/tomcat.py
+@@ -20,7 +20,7 @@ class Tomcat(Plugin, RedHatPlugin):
+     """
+ 
+     plugin_name = 'tomcat'
+-    profiles = ('webserver', 'java', 'services')
++    profiles = ('webserver', 'java', 'services', 'sysmgmt')
+ 
+     packages = ('tomcat6', 'tomcat')
+ 
+-- 
+1.8.3.1
+
+From c5e1bd7410eaf2deeb9267eeffef8bb9d151b5e8 Mon Sep 17 00:00:00 2001
+From: Coty Sutherland <csutherl@redhat.com>
+Date: Wed, 15 Jun 2016 09:21:38 -0400
+Subject: [PATCH] [tomcat] Added collection of all tomcat* logs
+
+Optionally collect all tomcat logs, in addition to catalina.out,
+with the use of the --all-logs option and update tomcat paths for
+versions 7 and 8 (as packaged in Red Hat JBoss).
+
+Resolves #836.
+
+Signed-off-by: Coty Sutherland <csutherl@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/tomcat.py | 29 +++++++++++++++++++++++++----
+ 1 file changed, 25 insertions(+), 4 deletions(-)
+
+diff --git a/sos/plugins/tomcat.py b/sos/plugins/tomcat.py
+index fe7bab8..0ee5ca8 100644
+--- a/sos/plugins/tomcat.py
++++ b/sos/plugins/tomcat.py
+@@ -13,6 +13,7 @@
+ # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ 
+ from sos.plugins import Plugin, RedHatPlugin
++from datetime import datetime
+ 
+ 
+ class Tomcat(Plugin, RedHatPlugin):
+@@ -22,19 +23,39 @@ class Tomcat(Plugin, RedHatPlugin):
+     plugin_name = 'tomcat'
+     profiles = ('webserver', 'java', 'services', 'sysmgmt')
+ 
+-    packages = ('tomcat6', 'tomcat')
++    packages = ('tomcat', 'tomcat6', 'tomcat7', 'tomcat8')
+ 
+     def setup(self):
+         self.add_copy_spec([
+             "/etc/tomcat",
+-            "/etc/tomcat6"
++            "/etc/tomcat6",
++            "/etc/tomcat7",
++            "/etc/tomcat8"
+         ])
+ 
+         limit = self.get_option("log_size")
+-        log_glob = "/var/log/tomcat*/catalina.out"
+-        self.add_copy_spec_limit(log_glob, sizelimit=limit)
++
++        if not self.get_option("all_logs"):
++            log_glob = "/var/log/tomcat*/catalina.out"
++            self.add_copy_spec_limit(log_glob, sizelimit=limit)
++
++            # get today's date in iso format so that days/months below 10
++            # prepend 0
++            today = datetime.date(datetime.now()).isoformat()
++            log_glob = "/var/log/tomcat*/catalina.%s.log" % today
++            self.add_copy_spec_limit(log_glob, sizelimit=limit)
++        else:
++            self.add_copy_spec("/var/log/tomcat*/*")
+ 
+     def postproc(self):
++        serverXmlPasswordAttributes = ['keyPass', 'keystorePass',
++                                       'truststorePass', 'SSLPassword']
++        for attr in serverXmlPasswordAttributes:
++            self.do_path_regex_sub(
++                r"\/etc\/tomcat.*\/server.xml",
++                r"%s=(\S*)" % attr,
++                r'%s="********"' % attr
++            )
+         self.do_path_regex_sub(
+             r"\/etc\/tomcat.*\/tomcat-users.xml",
+             r"password=(\S*)",
+-- 
+1.8.3.1
+

@@ -1,0 +1,53 @@
+From 16bf3224175bb844edc702b688684745e85ce622 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Sun, 25 Aug 2019 12:54:55 +0200
+Subject: [PATCH] [satellite] dont collect apache and squid data
+
+Stop collecting duplicate data that apache and squid plugin are responsible for.
+
+Resolves: #1766
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/satellite.py | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/sos/plugins/satellite.py b/sos/plugins/satellite.py
+index 8373307..b34314e 100644
+--- a/sos/plugins/satellite.py
++++ b/sos/plugins/satellite.py
+@@ -20,8 +20,6 @@ class Satellite(Plugin, RedHatPlugin):
+     satellite = False
+     proxy = False
+ 
+-    option_list = [("log", 'gathers all apache logs', 'slow', False)]
+-
+     def rhn_package_check(self):
+         self.satellite = self.is_installed("rhns-satellite-tools") \
+             or self.is_installed("spacewalk-java") \
+@@ -38,14 +36,10 @@ class Satellite(Plugin, RedHatPlugin):
+     def setup(self):
+         self.rhn_package_check()
+         self.add_copy_spec([
+-            "/etc/httpd/conf*",
+             "/etc/rhn",
+             "/var/log/rhn*"
+         ])
+ 
+-        if self.get_option("log"):
+-            self.add_copy_spec("/var/log/httpd")
+-
+         # all these used to go in $DIR/mon-logs/
+         self.add_copy_spec([
+             "/opt/notification/var/*.log*",
+@@ -80,7 +74,4 @@ class Satellite(Plugin, RedHatPlugin):
+                     + "spacewalk-backend is older than 2.5.3-137"
+                 )
+ 
+-        if self.proxy:
+-            self.add_copy_spec(["/etc/squid", "/var/log/squid"])
+-
+ # vim: et ts=4 sw=4
+-- 
+1.8.3.1
+

@@ -1,0 +1,92 @@
+From 5cc06136d68536b806ce09ce61f800d9a7938790 Mon Sep 17 00:00:00 2001
+From: Lukas Zapletal <lzap+git@redhat.com>
+Date: Tue, 3 Feb 2015 16:42:11 +0100
+Subject: [PATCH] [foreman] Skip collection of generic resources
+
+New option was added to foreman-debug (-g) to skip collecting of generic
+resources (firewall, selinux, cpu, memory). This patch leverages that.
+
+https://github.com/theforeman/foreman/blob/develop/script/foreman-debug
+
+Since katello-debug is now part of foreman-debug (as a plugin), there is no
+need of separate sosreport plugin.
+
+https://github.com/Katello/katello/blob/master/deploy/script/katello-debug.sh
+
+New subpackage called foreman-debug was introduced. It is present in both
+upstream Foreman and Katello installations as well as on both Satellite 6 main
+node and capsule instances. It can be used to detect if foreman-debug script is
+present.
+
+Signed-off-by: Lukas Zapletal <lzap+git@redhat.com>
+---
+ sos/plugins/foreman.py |    6 +++---
+ sos/plugins/katello.py |   32 --------------------------------
+ 2 files changed, 3 insertions(+), 35 deletions(-)
+ delete mode 100644 sos/plugins/katello.py
+
+diff --git a/sos/plugins/foreman.py b/sos/plugins/foreman.py
+index 896add1..e50cbdf 100644
+--- a/sos/plugins/foreman.py
++++ b/sos/plugins/foreman.py
+@@ -18,16 +18,16 @@ from sos.plugins import Plugin, RedHatPlugin
+ 
+ 
+ class Foreman(Plugin, RedHatPlugin):
+-    """Foreman systems management
++    """Foreman/Satellite 6 systems management
+     """
+ 
+     plugin_name = 'foreman'
+     profiles = ('sysmgmt',)
+-    packages = ('foreman')
++    packages = ('foreman-debug')
+ 
+     def setup(self):
+         cmd = "foreman-debug"
+         path = self.get_cmd_output_path(name="foreman-debug")
+-        self.add_cmd_output("%s -q -a -d %s" % (cmd, path))
++        self.add_cmd_output("%s -g -q -a -d %s" % (cmd, path))
+ 
+ # vim: et ts=4 sw=4
+diff --git a/sos/plugins/katello.py b/sos/plugins/katello.py
+deleted file mode 100644
+index 795c07e..0000000
+--- a/sos/plugins/katello.py
++++ /dev/null
+@@ -1,32 +0,0 @@
+-# Copyright (C) 2013 Red Hat, Inc., Lukas Zapletal <lzap@redhat.com>
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2 of the License, or
+-# (at your option) any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+-
+-from sos.plugins import Plugin, RedHatPlugin
+-
+-
+-class Katello(Plugin, RedHatPlugin):
+-    """Katello systems management
+-    """
+-
+-    plugin_name = 'katello'
+-    profiles = ('sysmgmt',)
+-    packages = ('katello', 'katello-common', 'katello-headpin')
+-
+-    def setup(self):
+-        self.add_cmd_output("katello-debug --notar -d %s"
+-                            % self.get_cmd_output_path(name="katello-debug"))
+-
+-# vim: et ts=4 sw=4
+-- 
+1.7.1
+

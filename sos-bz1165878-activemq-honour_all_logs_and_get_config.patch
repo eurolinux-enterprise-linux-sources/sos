@@ -1,0 +1,77 @@
+From e2a94de2e574b61d1da071f961863d2490c90bc0 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pep=20Turr=C3=B3=20Mauri?= <pep@redhat.com>
+Date: Tue, 23 Dec 2014 19:36:29 +0100
+Subject: [PATCH] [activemq] Honour all_logs and get config on RHEL
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Get only current log file by default, allowing full dir
+collection via the all_logs option.
+
+Add a Red Hat version of the plugin that collects the two
+main configuration files for activemq. Also enable that plugin
+in the OpenShift profile.
+
+Related: RHBZ#1165878
+Fixes: #457.
+
+Signed-off-by: Pep Turró Mauri <pep@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/activemq.py |   31 ++++++++++++++++++++++++++++---
+ 1 files changed, 28 insertions(+), 3 deletions(-)
+
+diff --git a/sos/plugins/activemq.py b/sos/plugins/activemq.py
+index 291fcd9..1594229 100644
+--- a/sos/plugins/activemq.py
++++ b/sos/plugins/activemq.py
+@@ -16,17 +16,42 @@
+ from sos.plugins import Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin
+ 
+ 
+-class ActiveMq(Plugin, RedHatPlugin, DebianPlugin):
++class ActiveMq(Plugin, DebianPlugin):
+     """ActiveMQ message broker
+     """
+ 
+     plugin_name = 'activemq'
+-    profiles = ()
++    profiles = ('openshift',)
+     packages = ('activemq', 'activemq-core')
+     files = ('/var/log/activemq',)
+ 
+     def setup(self):
+-        self.add_copy_spec(list(self.files))
++        if self.get_option("all_logs"):
++            self.add_copy_spec(list(self.files))
++        else:
++            self.add_copy_spec([
++                "/var/log/activemq/activemq.log",
++                "/var/log/activemq/wrapper.log"
++            ])
++
++    def postproc(self):
++        # activemq.xml contains credentials in this form:
++        #   <authenticationUser ... password="changeme" ... />
++        self.do_file_sub(
++            '/etc/activemq/activemq.xml',
++            r'(\s*password=")[^"]*(".*)',
++            r"\1******\2"
++        )
++
++
++class RedHatActiveMq(ActiveMq, RedHatPlugin):
++
++    def setup(self):
++        super(RedHatActiveMq, self).setup()
++        self.add_copy_spec([
++            '/etc/sysconfig/activemq',
++            '/etc/activemq/activemq.xml'
++        ])
+ 
+ 
+ class UbuntuActiveMq(ActiveMq, UbuntuPlugin):
+-- 
+1.7.1
+

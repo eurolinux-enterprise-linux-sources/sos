@@ -1,0 +1,61 @@
+diff -up sos-3.2/sos/archive.py.orig sos-3.2/sos/archive.py
+--- sos-3.2/sos/archive.py.orig	2014-12-17 13:08:57.492362543 +0000
++++ sos-3.2/sos/archive.py	2014-12-17 13:09:22.256522491 +0000
+@@ -388,9 +388,9 @@ class TarFileArchive(FileCacheArchive):
+                           close_fds=True)
+                 stdout, stderr = p.communicate()
+                 if stdout:
+-                    self.log_info(stdout.decode('utf-8'))
++                    self.log_info(stdout.decode('utf-8', 'ignore'))
+                 if stderr:
+-                    self.log_error(stderr.decode('utf-8'))
++                    self.log_error(stderr.decode('utf-8', 'ignore'))
+                 self._suffix += suffix
+                 return self.name()
+             except Exception as e:
+diff -up sos-3.2/sos/plugins/__init__.py.orig sos-3.2/sos/plugins/__init__.py
+--- sos-3.2/sos/plugins/__init__.py.orig	2014-12-17 13:08:57.493362550 +0000
++++ sos-3.2/sos/plugins/__init__.py	2014-12-17 13:09:22.257522498 +0000
+@@ -541,7 +541,7 @@ class Plugin(object):
+     def add_string_as_file(self, content, filename):
+         """Add a string to the archive as a file named `filename`"""
+         self.copy_strings.append((content, filename))
+-        content = "..." + (content.splitlines()[0]).decode('utf8')
++        content = "..." + (content.splitlines()[0]).decode('utf8', 'ignore')
+         self._log_debug("added string '%s' as '%s'" % (content, filename))
+ 
+     def get_cmd_output_now(self, exe, suggest_filename=None,
+@@ -610,7 +610,8 @@ class Plugin(object):
+ 
+     def _collect_strings(self):
+         for string, file_name in self.copy_strings:
+-            content = "..." + (string.splitlines()[0]).decode('utf8')
++            content = "..."
++            content += (string.splitlines()[0]).decode('utf8', 'ignore')
+             self._log_info("collecting string '%s' as '%s'"
+                            % (content, file_name))
+             try:
+diff -up sos-3.2/sos/utilities.py.orig sos-3.2/sos/utilities.py
+--- sos-3.2/sos/utilities.py.orig	2014-12-17 13:09:16.709486664 +0000
++++ sos-3.2/sos/utilities.py	2014-12-17 13:09:22.257522498 +0000
+@@ -140,7 +140,7 @@ def sos_get_command_output(command, time
+ 
+     # shlex.split() reacts badly to unicode on older python runtimes.
+     if not six.PY3:
+-        command = command.encode('utf-8')
++        command = command.encode('utf-8', 'ignore')
+     args = shlex.split(command)
+     try:
+         p = Popen(args, shell=False, stdout=PIPE, stderr=STDOUT,
+@@ -159,7 +159,10 @@ def sos_get_command_output(command, time
+     if p.returncode == 126 or p.returncode == 127:
+         stdout = six.binary_type(b"")
+ 
+-    return {'status': p.returncode, 'output': stdout.decode('utf-8')}
++    return {
++        'status': p.returncode,
++        'output': stdout.decode('utf-8', 'ignore')
++    }
+ 
+ 
+ def import_module(module_fqname, superclasses=None):

@@ -1,0 +1,44 @@
+From: Filip Krska <fkrska@redhat.com>
+
+Date: Mon, 26 Feb 2018 13:50:00 +0000
+Subject: [satellite] skip spacewalk-debug if spacewalk-backend too old
+
+Gather spacewalk-debug data only if spacewalk-backend is 2.5.3-137
+or newer where rhbz#1439949 fixed performance issues.
+
+Signed-off-by: Filip Krska <fkrska@redhat.com>
+---
+ sos/plugins/satellite.py |   17 +++++++++++++----
+ 1 files changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/sos/plugins/satellite.py b/sos/plugins/satellite.py
+index ca0565b..92a3484 100644
+--- a/sos/plugins/satellite.py
++++ b/sos/plugins/satellite.py
+@@ -79,10 +79,19 @@ class Satellite(Plugin, RedHatPlugin):
+                 "/etc/tnsnames.ora",
+                 "/etc/jabberd"
+             ])
+-            self.add_cmd_output(
+-                "spacewalk-debug --dir %s"
+-                % self.get_cmd_output_path(name="spacewalk-debug"),
+-                timeout=900)
++            spacewalk_backend_pkg = self.policy().package_manager.all_pkgs()['spacewalk-backend']
++            spacewalk_backend_vr = [int(i) for i in spacewalk_backend_pkg["version"]]
++            spacewalk_backend_vr.append(int(spacewalk_backend_pkg["release"].split(".")[0]))
++            if spacewalk_backend_vr >= [2, 5, 3, 137]:
++                self.add_cmd_output(
++                    "spacewalk-debug --dir %s"
++                    % self.get_cmd_output_path(name="spacewalk-debug"),
++                    timeout=900)
++            else:
++                self.soslog.warning(
++                    "skipping spacewalk-debug due to rhbz#1439949, "
++                    + "spacewalk-backend is older than 2.5.3-137"
++                )
+ 
+         if self.proxy:
+             self.add_copy_spec(["/etc/squid", "/var/log/squid"])
+--
+1.7.1
+

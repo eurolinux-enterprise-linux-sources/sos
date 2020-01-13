@@ -1,0 +1,646 @@
+From 6038fdf8617319a13b0b42f3283ec2066d54b283 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Thu, 19 Nov 2015 18:46:36 +0000
+Subject: [PATCH] [policies] move hash determination to policies
+
+It's crazy having the Policy classes call a function in the
+utilities module only to have that function then load the Policy
+module, call policy.get_preferred_hash_algorithm() and then test
+the result.
+
+Get rid of the get_hash_name() function in the utilities module
+and simplify the calls in the policies module to obtain the
+preferred hash name.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/policies/__init__.py | 22 +++++++++++++++-------
+ sos/utilities.py         | 12 ------------
+ tests/utilities_tests.py |  2 +-
+ 3 files changed, 16 insertions(+), 20 deletions(-)
+
+diff --git a/sos/policies/__init__.py b/sos/policies/__init__.py
+index a403bb9..bf9afde 100644
+--- a/sos/policies/__init__.py
++++ b/sos/policies/__init__.py
+@@ -10,7 +10,6 @@ from os import environ
+ 
+ from sos.utilities import (ImporterHelper,
+                            import_module,
+-                           get_hash_name,
+                            shell_out)
+ from sos.plugins import IndependentPlugin
+ from sos import _sos as _
+@@ -286,17 +285,17 @@ No changes will be made to system configuration.
+         considered to be a superuser"""
+         return (os.getuid() == 0)
+ 
+-    def _create_checksum(self, final_filename=None):
++    def _create_checksum(self, hash_name, final_filename=None):
+         if not final_filename:
+             return False
+ 
+         archive_fp = open(final_filename, 'rb')
+-        digest = hashlib.new(get_hash_name())
++        digest = hashlib.new(hash_name)
+         digest.update(archive_fp.read())
+         archive_fp.close()
+         return digest.hexdigest()
+ 
+-    def get_preferred_hash_algorithm(self):
++    def get_preferred_hash_name(self):
+         """Returns the string name of the hashlib-supported checksum algorithm
+         to use"""
+         return "md5"
+@@ -309,10 +308,11 @@ No changes will be made to system configuration.
+ 
+         self._print()
+ 
++        hash_name = self.get_preferred_hash_name()
+         if not build:
+             # store checksum into file
+-            fp = open(final_filename + "." + get_hash_name(), "w")
+-            checksum = self._create_checksum(final_filename)
++            fp = open(final_filename + "." + hash_name, "w")
++            checksum = self._create_checksum(hash_name, final_filename)
+             if checksum:
+                 fp.write(checksum + "\n")
+             fp.close()
+@@ -373,20 +373,28 @@ class LinuxPolicy(Policy):
+     vendor = "None"
+     PATH = "/bin:/sbin:/usr/bin:/usr/sbin"
+ 
++    _preferred_hash_name = None
++
+     def __init__(self):
+         super(LinuxPolicy, self).__init__()
+ 
+-    def get_preferred_hash_algorithm(self):
++    def get_preferred_hash_name(self):
++
++        if self._preferred_hash_name:
++            return self._preferred_hash_name
++
+         checksum = "md5"
+         try:
+             fp = open("/proc/sys/crypto/fips_enabled", "r")
+         except:
++            self._preferred_hash_name = checksum
+             return checksum
+ 
+         fips_enabled = fp.read()
+         if fips_enabled.find("1") >= 0:
+             checksum = "sha256"
+         fp.close()
++        self._preferred_hash_name = checksum
+         return checksum
+ 
+     def default_runlevel(self):
+diff --git a/sos/utilities.py b/sos/utilities.py
+index d3a1048..63e7ee4 100644
+--- a/sos/utilities.py
++++ b/sos/utilities.py
+@@ -52,18 +52,6 @@ def fileobj(path_or_file, mode='r'):
+         return closing(path_or_file)
+ 
+ 
+-def get_hash_name():
+-    """Returns the algorithm used when computing a hash"""
+-    import sos.policies
+-    policy = sos.policies.load()
+-    try:
+-        name = policy.get_preferred_hash_algorithm()
+-        hashlib.new(name)
+-        return name
+-    except:
+-        return 'sha256'
+-
+-
+ def convert_bytes(bytes_, K=1 << 10, M=1 << 20, G=1 << 30, T=1 << 40):
+     """Converts a number of bytes to a shorter, more human friendly format"""
+     fn = float(bytes_)
+diff --git a/tests/utilities_tests.py b/tests/utilities_tests.py
+index c464692..f1b60e2 100644
+--- a/tests/utilities_tests.py
++++ b/tests/utilities_tests.py
+@@ -3,7 +3,7 @@ import unittest
+
+ from StringIO import StringIO
+
+-from sos.utilities import grep, get_hash_name, is_executable, sos_get_command_output, find, tail, shell_out
++from sos.utilities import grep, is_executable, sos_get_command_output, find, tail, shell_out
+ import sos
+
+ TEST_DIR = os.path.dirname(__file__)
+-- 
+1.8.3.1
+
+From 7f2727749d0c37095a20c5d4cf6f9a2e086a2375 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Thu, 19 Nov 2015 19:07:50 +0000
+Subject: [PATCH] [policies] refactor Policy.display_results() args
+
+Pass explicit archive and build directory arguments to the
+Policy.display_results() method rather than a single path name
+argument and a boolean to indicate whether it is an archive file
+or a build directory path.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/policies/__init__.py | 24 ++++++++++++++----------
+ sos/sosreport.py         | 12 +++++++++---
+ 2 files changed, 23 insertions(+), 13 deletions(-)
+
+diff --git a/sos/policies/__init__.py b/sos/policies/__init__.py
+index bf9afde..5b0b706 100644
+--- a/sos/policies/__init__.py
++++ b/sos/policies/__init__.py
+@@ -285,11 +285,11 @@ No changes will be made to system configuration.
+         considered to be a superuser"""
+         return (os.getuid() == 0)
+ 
+-    def _create_checksum(self, hash_name, final_filename=None):
+-        if not final_filename:
++    def _create_checksum(self, hash_name, archive=None):
++        if not archive:
+             return False
+ 
+-        archive_fp = open(final_filename, 'rb')
++        archive_fp = open(archive, 'rb')
+         digest = hashlib.new(hash_name)
+         digest.update(archive_fp.read())
+         archive_fp.close()
+@@ -300,29 +300,33 @@ No changes will be made to system configuration.
+         to use"""
+         return "md5"
+ 
+-    def display_results(self, final_filename=None, build=False):
++    def display_results(self, archive, directory):
++        # Display results is called from the tail of SoSReport.final_work()
++        #
++        # Logging is already shutdown and all terminal output must use the
++        # print() call.
+ 
+         # make sure a report exists
+-        if not final_filename:
++        if not archive and not directory:
+             return False
+ 
+         self._print()
+ 
+         hash_name = self.get_preferred_hash_name()
+-        if not build:
++        if archive:
+             # store checksum into file
+-            fp = open(final_filename + "." + hash_name, "w")
+-            checksum = self._create_checksum(hash_name, final_filename)
++            fp = open(archive + "." + hash_name, "w")
++            checksum = self._create_checksum(hash_name, archive)
+             if checksum:
+                 fp.write(checksum + "\n")
+             fp.close()
+ 
+             self._print(_("Your sosreport has been generated and saved "
+-                        "in:\n  %s") % final_filename)
++                        "in:\n  %s") % archive)
+         else:
+             checksum = None
+             self._print(_("sosreport build tree is located at : %s" %
+-                        final_filename))
++                        directory))
+ 
+         self._print()
+         if checksum:
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index a1f1b96..f3e0f34 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -1436,6 +1436,10 @@ class SoSReport(object):
+         # this must come before archive creation to ensure that log
+         # files are closed and cleaned up at exit.
+         self._finish_logging()
++
++        archive = None    # archive path
++        directory = None  # report directory path (--build)
++
+         # package up the results for the support organization
+         if not self.opts.build:
+             old_umask = os.umask(0o077)
+@@ -1443,7 +1447,7 @@ class SoSReport(object):
+                 print(_("Creating compressed archive..."))
+             # compression could fail for a number of reasons
+             try:
+-                final_filename = self.archive.finalize(
++                archive = self.archive.finalize(
+                     self.opts.compression_type)
+             except (OSError, IOError) as e:
+                 if e.errno in fatal_fs_errors:
+@@ -1460,8 +1464,10 @@ class SoSReport(object):
+             finally:
+                 os.umask(old_umask)
+         else:
+-            final_filename = self.archive.get_archive_path()
+-        self.policy.display_results(final_filename, build=self.opts.build)
++            directory = self.archive.get_archive_path()
++
++        self.policy.display_results(archive, directory)
++
+         self.tempfile_util.clean()
+         return True
+ 
+-- 
+1.8.3.1
+
+From 19e2bbccb6a86d6ea94f5c82860bed4d2276bbf3 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Thu, 19 Nov 2015 19:19:42 +0000
+Subject: [PATCH] [sosreport] move archive checksumming to sosreport
+
+Although the digest algorithm is policy controlled the actual
+mechanism to checksum the archive does not belong in the policies
+module: historically this was done to keep the code that calculates
+the checksum close to the UI code that reports it.
+
+Move the calculation to the main SoSReport class's final_work()
+method and add a 'checksum' argument to the display_results()
+method so that the value can be reported.
+
+In future it may make sense to push the checksum code directly into
+the archive class.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/policies/__init__.py | 22 +---------------------
+ sos/sosreport.py         | 26 +++++++++++++++++++++++++-
+ 2 files changed, 26 insertions(+), 22 deletions(-)
+
+diff --git a/sos/policies/__init__.py b/sos/policies/__init__.py
+index 5b0b706..20e0e3b 100644
+--- a/sos/policies/__init__.py
++++ b/sos/policies/__init__.py
+@@ -14,7 +14,6 @@ from sos.utilities import (ImporterHelpe
+                            shell_out)
+ from sos.plugins import IndependentPlugin
+ from sos import _sos as _
+-import hashlib
+ from textwrap import fill
+ print_ = print
+
+@@ -285,22 +284,12 @@ No changes will be made to system configuration.
+         considered to be a superuser"""
+         return (os.getuid() == 0)
+ 
+-    def _create_checksum(self, hash_name, archive=None):
+-        if not archive:
+-            return False
+-
+-        archive_fp = open(archive, 'rb')
+-        digest = hashlib.new(hash_name)
+-        digest.update(archive_fp.read())
+-        archive_fp.close()
+-        return digest.hexdigest()
+-
+     def get_preferred_hash_name(self):
+         """Returns the string name of the hashlib-supported checksum algorithm
+         to use"""
+         return "md5"
+ 
+-    def display_results(self, archive, directory):
++    def display_results(self, archive, directory, checksum):
+         # Display results is called from the tail of SoSReport.final_work()
+         #
+         # Logging is already shutdown and all terminal output must use the
+@@ -312,19 +301,10 @@ No changes will be made to system configuration.
+ 
+         self._print()
+ 
+-        hash_name = self.get_preferred_hash_name()
+         if archive:
+-            # store checksum into file
+-            fp = open(archive + "." + hash_name, "w")
+-            checksum = self._create_checksum(hash_name, archive)
+-            if checksum:
+-                fp.write(checksum + "\n")
+-            fp.close()
+-
+             self._print(_("Your sosreport has been generated and saved "
+                         "in:\n  %s") % archive)
+         else:
+-            checksum = None
+             self._print(_("sosreport build tree is located at : %s" %
+                         directory))
+ 
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index f3e0f34..f7a5f11 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -33,6 +33,7 @@ from stat import ST_UID, ST_GID, ST_MODE, ST_CTIME, ST_ATIME, ST_MTIME, S_IMODE
+ from time import strftime, localtime
+ from collections import deque
+ import tempfile
++import hashlib
+ 
+ from sos import _sos as _
+ from sos import __version__
+@@ -1432,6 +1433,18 @@ class SoSReport(object):
+                     raise
+                 self._log_plugin_exception(plugname, "postproc")
+ 
++    def _create_checksum(self, archive=None):
++        if not archive:
++            return False
++
++        hash_name = self.policy.get_preferred_hash_name()
++
++        archive_fp = open(archive, 'rb')
++        digest = hashlib.new(hash_name)
++        digest.update(archive_fp.read())
++        archive_fp.close()
++        return digest.hexdigest()
++
+     def final_work(self):
+         # this must come before archive creation to ensure that log
+         # files are closed and cleaned up at exit.
+@@ -1466,7 +1479,18 @@ class SoSReport(object):
+         else:
+             directory = self.archive.get_archive_path()
+ 
+-        self.policy.display_results(archive, directory)
++        hash_name = self.policy.get_preferred_hash_name()
++        checksum = None
++
++        if hash_name and not self.opts.build:
++            # store checksum into file
++            fp = open(archive + "." + hash_name, "w")
++            checksum = self._create_checksum(archive)
++            if checksum:
++                fp.write(checksum + "\n")
++            fp.close()
++
++        self.policy.display_results(archive, directory, checksum)
+ 
+         self.tempfile_util.clean()
+         return True
+-- 
+1.8.3.1
+
+diff -up sos-3.2/sos/sosreport.py.org sos-3.2/sos/sosreport.py
+--- sos-3.2/sos/sosreport.py.org      2016-01-04 13:50:22.378631595 -0500
++++ sos-3.2/sos/sosreport.py	      2016-01-04 13:51:46.448001148 -0500
+@@ -636,9 +636,10 @@ class SoSReport(object):
+             self.policy.get_tmp_dir(self.opts.tmp_dir))
+         if not os.path.isdir(self.tmpdir) \
+                 or not os.access(self.tmpdir, os.W_OK):
++            msg = "temporary directory %s " % self.tmpdir
++            msg += "does not exist or is not writable\n"
+             # write directly to stderr as logging is not initialised yet
+-            sys.stderr.write("temporary directory %s " % self.tmpdir
+-                             + "does not exist or is not writable\n")
++            sys.stderr.write(msg)
+             self._exit(1)
+         self.tempfile_util = TempFileUtil(self.tmpdir)
+         self._set_directories()
+
+
+From 4a9b919a7f1b9542a23982e49cc9035e84551e13 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Fri, 20 Nov 2015 18:48:33 +0000
+Subject: [PATCH] [sosreport] prepare report in a private subdirectory
+
+To avoid file creation races in shared temporary directories like
+/tmp and /var/tmp use a private (0700) subdirectory to build the
+FileCacheArchive and subsequent archive and compressed archive
+files: only create a file in the containing directory when it can
+be done as a single atomic rename.
+
+This prevents sos from writing to an arbitrary location under the
+control of another user: a malicious user could steal data or over
+write files in /etc resulting in a local privilege escalation.
+
+There remains a further race since once the archive name is known
+the checksum file name becomes predictable: as the checksum file
+is also prepared in the subdirectory and moved into place the
+result is always either success or an error that is reported to
+the user.
+
+The correct checksum value is still reported to the user via the
+terminal.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/sosreport.py | 100 ++++++++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 77 insertions(+), 23 deletions(-)
+
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index f7a5f11..fe251ed 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -32,6 +32,7 @@ from sos.utilities import ImporterHelper
+ from stat import ST_UID, ST_GID, ST_MODE, ST_CTIME, ST_ATIME, ST_MTIME, S_IMODE
+ from time import strftime, localtime
+ from collections import deque
++from shutil import rmtree
+ import tempfile
+ import hashlib
+ 
+@@ -678,6 +679,7 @@ class SoSReport(object):
+         self.archive = None
+         self.tempfile_util = None
+         self._args = args
++        self.sys_tmp = None
+ 
+         try:
+             import signal
+@@ -696,16 +698,23 @@ class SoSReport(object):
+ 
+         self._is_root = self.policy.is_root()
+ 
+-        self.tmpdir = os.path.abspath(
+-            self.policy.get_tmp_dir(self.opts.tmp_dir))
+-        if not os.path.isdir(self.tmpdir) \
+-                or not os.access(self.tmpdir, os.W_OK):
+-            msg = "temporary directory %s " % self.tmpdir
++        # system temporary directory to use
++        tmp = os.path.abspath(self.policy.get_tmp_dir(self.opts.tmp_dir))
++
++        if not os.path.isdir(tmp) \
++                or not os.access(tmp, os.W_OK):
++            msg = "temporary directory %s " % tmp
+             msg += "does not exist or is not writable\n"
+             # write directly to stderr as logging is not initialised yet
+             sys.stderr.write(msg)
+             self._exit(1)
++
++        self.sys_tmp = tmp
++
++        # our (private) temporary directory
++        self.tmpdir = tempfile.mkdtemp(prefix="sos.", dir=self.sys_tmp)
+         self.tempfile_util = TempFileUtil(self.tmpdir)
++
+         self._set_directories()
+ 
+     def print_header(self):
+@@ -1433,27 +1442,34 @@ class SoSReport(object):
+                     raise
+                 self._log_plugin_exception(plugname, "postproc")
+ 
+-    def _create_checksum(self, archive=None):
++    def _create_checksum(self, archive, hash_name):
+         if not archive:
+             return False
+ 
+-        hash_name = self.policy.get_preferred_hash_name()
+-
+         archive_fp = open(archive, 'rb')
+         digest = hashlib.new(hash_name)
+         digest.update(archive_fp.read())
+         archive_fp.close()
+         return digest.hexdigest()
+ 
++    def _write_checksum(self, archive, hash_name, checksum):
++            # store checksum into file
++            fp = open(archive + "." + hash_name, "w")
++            if checksum:
++                fp.write(checksum + "\n")
++            fp.close()
++
+     def final_work(self):
+-        # this must come before archive creation to ensure that log
++        # This must come before archive creation to ensure that log
+         # files are closed and cleaned up at exit.
++        #
++        # All subsequent terminal output must use print().
+         self._finish_logging()
+ 
+         archive = None    # archive path
+         directory = None  # report directory path (--build)
+ 
+-        # package up the results for the support organization
++        # package up and compress the results
+         if not self.opts.build:
+             old_umask = os.umask(0o077)
+             if not self.opts.quiet:
+@@ -1464,10 +1480,9 @@ class SoSReport(object):
+                     self.opts.compression_type)
+             except (OSError, IOError) as e:
+                 if e.errno in fatal_fs_errors:
+-                    self.ui_log.error("")
+-                    self.ui_log.error(" %s while finalizing archive"
+-                                      % e.strerror)
+-                    self.ui_log.error("")
++                    print("")
++                    print(_(" %s while finalizing archive" % e.strerror))
++                    print("")
+                     self._exit(1)
+             except:
+                 if self.opts.debug:
+@@ -1477,18 +1492,55 @@ class SoSReport(object):
+             finally:
+                 os.umask(old_umask)
+         else:
++            # move the archive root out of the private tmp directory.
+             directory = self.archive.get_archive_path()
++            dir_name = os.path.basename(directory)
++            try:
++                os.rename(directory, os.path.join(self.sys_tmp, dir_name))
++            except (OSError, IOError):
++                    print(_("Error moving directory: %s" % directory))
++                    return False
+ 
+-        hash_name = self.policy.get_preferred_hash_name()
+         checksum = None
+ 
+-        if hash_name and not self.opts.build:
+-            # store checksum into file
+-            fp = open(archive + "." + hash_name, "w")
+-            checksum = self._create_checksum(archive)
+-            if checksum:
+-                fp.write(checksum + "\n")
+-            fp.close()
++        if not self.opts.build:
++            # compute and store the archive checksum
++            hash_name = self.policy.get_preferred_hash_name()
++            checksum = self._create_checksum(archive, hash_name)
++            self._write_checksum(archive, hash_name, checksum)
++
++            # output filename is in the private tmpdir - move it to the
++            # containing directory.
++            final_name = os.path.join(self.sys_tmp, os.path.basename(archive))
++
++            archive_hash = archive + "." + hash_name
++            final_hash = final_name + "." + hash_name
++
++            # move the archive and checksum file
++            try:
++                    os.rename(archive, final_name)
++                    archive = final_name
++            except (OSError, IOError):
++                    print(_("Error moving archive file: %s" % archive))
++                    return False
++
++            # There is a race in the creation of the final checksum file:
++            # since the archive has already been published and the checksum
++            # file name is predictable once the archive name is known a
++            # malicious user could attempt to create a symbolic link in order
++            # to misdirect writes to a file of the attacker's choosing.
++            #
++            # To mitigate this we write the checksum inside the private tmp
++            # directory and use an atomic rename that is guaranteed to either
++            # succeed or fail: at worst the move will fail and be reported to
++            # the user. The correct checksum value is still written to the
++            # terminal and nothing is written to a location under the control
++            # of the user creating the link.
++            try:
++                    os.rename(archive_hash, final_hash)
++            except (OSError, IOError):
++                    print(_("Error moving checksum file: %s" % archive_hash))
++                    return False
+ 
+         self.policy.display_results(archive, directory, checksum)
+ 
+@@ -1546,8 +1598,10 @@ class SoSReport(object):
+                     self.archive.cleanup()
+                 if self.tempfile_util:
+                     self.tempfile_util.clean()
++                if self.tmpdir:
++                    rmtree(self.tmpdir)
+             except:
+-                pass
++                raise
+ 
+         return False
+ 
+-- 
+1.8.3.1
+
+From 08121d877741e33333a1ae01280f6898d7d4ca15 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Thu, 10 Dec 2015 11:50:49 +0000
+Subject: [PATCH] [sosreport] clean up private temporary directory
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/sosreport.py | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index fe251ed..bc7792a 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -1544,7 +1544,12 @@ class SoSReport(object):
+ 
+         self.policy.display_results(archive, directory, checksum)
+ 
+-        self.tempfile_util.clean()
++        # clean up
++        if self.tempfile_util:
++            self.tempfile_util.clean()
++        if self.tmpdir:
++            rmtree(self.tmpdir)
++
+         return True
+ 
+     def verify_plugins(self):
+-- 
+1.8.3.1
+

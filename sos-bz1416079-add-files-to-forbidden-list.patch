@@ -1,0 +1,71 @@
+diff -up sos-3.2/sos/plugins/cluster.py.org sos-3.2/sos/plugins/cluster.py
+--- sos-3.2/sos/plugins/cluster.py.org	2017-02-08 10:41:22.562802366 -0500
++++ sos-3.2/sos/plugins/cluster.py	2017-02-08 10:43:27.499442522 -0500
+@@ -50,7 +50,8 @@ class Cluster(Plugin, RedHatPlugin):
+     _debugfs_cleanup = False
+ 
+     def setup(self):
+-
++        self.add_forbidden_path("/var/lib/ricci/certs/key[3-4].db")
++        self.add_forbidden_path("/var/lib/ricci/certs/privkey.pem")
+         self.add_copy_spec([
+             "/etc/cluster.conf",
+             "/etc/cluster",
+diff -up sos-3.2/sos/plugins/ds.py.org sos-3.2/sos/plugins/ds.py
+--- sos-3.2/sos/plugins/ds.py.org	2017-02-08 10:41:10.151838314 -0500
++++ sos-3.2/sos/plugins/ds.py	2017-02-08 10:42:32.077601203 -0500
+@@ -43,7 +43,7 @@ class DirectoryServer(Plugin, RedHatPlug
+         self.add_forbidden_path("/etc/dirsrv/slapd*/key3.db")
+         self.add_forbidden_path("/etc/dirsrv/slapd*/pwfile.txt")
+         self.add_forbidden_path("/etc/dirsrv/slapd*/*passw*")
+-        self.add_forbidden_path("/etc/dirsrv/admin-serv/key3.db")
++        self.add_forbidden_path("/etc/dirsrv/admin-serv/key[3-4].db")
+         self.add_forbidden_path("/etc/dirsrv/admin-serv/admpw")
+         self.add_forbidden_path("/etc/dirsrv/admin-serv/password.conf")
+         try:
+diff -up sos-3.2/sos/plugins/openswan.py.org sos-3.2/sos/plugins/openswan.py
+--- sos-3.2/sos/plugins/openswan.py.org	2017-02-08 10:41:31.580776246 -0500
++++ sos-3.2/sos/plugins/openswan.py	2017-02-08 10:42:02.034688036 -0500
+@@ -31,6 +31,7 @@ class Openswan(Plugin, RedHatPlugin, Deb
+     packages = ('openswan',)
+ 
+     def setup(self):
++        self.add_forbidden_path("/etc/ipsec.d/key[3-4].db")
+         self.add_copy_spec([
+             "/etc/ipsec.conf",
+             "/etc/ipsec.d"
+diff -up sos-3.2/sos/plugins/smartcard.py.org sos-3.2/sos/plugins/smartcard.py
+--- sos-3.2/sos/plugins/smartcard.py.org	2017-02-08 10:41:01.364863765 -0500
++++ sos-3.2/sos/plugins/smartcard.py	2017-02-08 10:42:59.563522507 -0500
+@@ -28,6 +28,7 @@ class Smartcard(Plugin, RedHatPlugin):
+     packages = ('pam_pkcs11',)
+ 
+     def setup(self):
++        self.add_forbidden_path("/etc/pam_pkcs11/nssdb/key[3-4].db")
+         self.add_copy_spec([
+             "/etc/reader.conf",
+             "/etc/reader.conf.d/",
+diff -up sos-3.2/sos/plugins/ldap.py.org sos-3.2/sos/plugins/ldap.py
+--- sos-3.2/sos/plugins/ldap.py.org	2017-02-09 08:56:10.033639096 -0500
++++ sos-3.2/sos/plugins/ldap.py	2017-02-09 08:57:47.552358663 -0500
+@@ -42,7 +42,8 @@ class RedHatLdap(Ldap, RedHatPlugin):
+         self.add_forbidden_path("/etc/openldap/certs/pwfile.txt")
+         self.add_forbidden_path("/etc/openldap/certs/pin.txt")
+         self.add_forbidden_path("/etc/openldap/certs/*passw*")
+-        self.add_forbidden_path("/etc/openldap/certs/key3.db")
++        self.add_forbidden_path("/etc/openldap/certs/key[3-4].db")
++        self.add_forbidden_path("/etc/openldap/cacerts/key[3-4].db")
+         self.add_copy_spec([
+             self.ldap_conf,
+             "/etc/openldap/certs/cert8.db",
+diff -up sos-3.2/sos/plugins/cluster.py.org sos-3.2/sos/plugins/cluster.py
+--- sos-3.2/sos/plugins/cluster.py.org	2017-02-16 09:21:04.422338984 -0500
++++ sos-3.2/sos/plugins/cluster.py	2017-02-16 09:23:53.826787416 -0500
+@@ -52,6 +52,7 @@ class Cluster(Plugin, RedHatPlugin):
+     def setup(self):
+         self.add_forbidden_path("/var/lib/ricci/certs/key[3-4].db")
+         self.add_forbidden_path("/var/lib/ricci/certs/privkey.pem")
++        self.add_forbidden_path("/var/lib/ricci/certs/server.p12")
+         self.add_copy_spec([
+             "/etc/cluster.conf",
+             "/etc/cluster",

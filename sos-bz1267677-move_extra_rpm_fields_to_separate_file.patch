@@ -1,0 +1,75 @@
+From 18df2d0b165b5c40fbb45ec7ca9e9eecbe45528b Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Mon, 1 Feb 2016 17:44:26 +0000
+Subject: [PATCH] [rpm] move extra rpm fields to a separate file
+
+The installed-rpms file is intended as a quick list of all installed
+packages for distributions using the RPM package manager: the contents
+have been fairly stable over several major releases and are formatted to
+be human-readable in a standard 80x25 terminal without needing to filter
+or sort.
+
+The addition of several large fields over the last year has led to some
+significant bloat however:
+
+python-ply-3.6-2.fc23.noarch    Thu Oct  8 10:55:19 2015 1444298119      Fedora Project  buildvm-09.phx2.fedoraproject.org 89021503050055d3387032474cf834ec9cba0108f41f10009231fd54252a459cabaccf2b68f39b7f2ab5474c0f29906494593c58808f4ebcc9cb1910921ddfd0fcd02c8b394af5f07915166499eff319d128fae9850363ffb5d7977adfa5c2b298ec1818975c16dd95721d0a6e3a5fd1de8bcb3d871e5a1bf2b2d39a15c1c53c5936863835e944e4a087bb982448420d852557fcfc81965ea2ecd7d9b1d6783d4e2bd2a57418ebe4ca92e1fec47c8b78864fd3fa81bab4b5766c04f92af7fd61452ad0063211edf390e075393ee3f6e019593bb230c29f134d1511c719ade1dd533db787c8e79ee77219bd8415a821bdb4e516e3c44e6fa9d25627e5157f1460a3599a183b1579077a51651fc34a734ee67a63bdeae42dbaf8429bc73543938cc86e8a92150e6c2de9bd7db1ae84d4938399388a445d0dfc0410b3c7f0c50399fb85ea8ec5c64e4138111bf394188b65f0e8013ed4a23f2973df663c4811ff02312cd57e3293fcc728d6d6c9951351fd0cfea1a6d4e90d5ff38be4858eb7f308efa5793f3955d641baf6cdc5495cfba0228e03af8bde85ffbb955766c6e31c6cbffe40539ca794806515198f44176680c17431720f4de00c4bf695dc54c53225698b45d8ac5b139e46503015f2456b420aeb5fab9a7cef12abd7308e410687771ba644b10ae680c21cacc40c71c5ab0159c2e021931695dee20bdc9d9c957e097c9a800634b88d60ad9c0a554bac3a5ca97b0f63538b9808 RSA/SHA256, Tue Aug 18 14:51:44 2015, Key ID 32474cf834ec9cba
+
+vs.
+
+python-ply-3.6-2.fc23.noarch                                Thu Oct  8 10:55:19 2015
+
+Revert the installed-rpms file back to the original format and add a new
+file, package-data in the rpm plugin's commands directory that contains
+these additional rpm query fields.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/rpm.py | 29 ++++++++++++++++++++++-------
+ 1 file changed, 22 insertions(+), 7 deletions(-)
+
+diff --git a/sos/plugins/rpm.py b/sos/plugins/rpm.py
+index db55aba..845e85d 100644
+--- a/sos/plugins/rpm.py
++++ b/sos/plugins/rpm.py
+@@ -37,16 +37,31 @@ class Rpm(Plugin, RedHatPlugin):
+     def setup(self):
+         self.add_copy_spec("/var/log/rpmpkgs")
+ 
++        def add_rpm_cmd(query_fmt, filter_cmd, symlink, suggest):
++            rpmq_cmd = 'rpm --nodigest -qa --qf=%s' % query_fmt
++            shell_cmd = rpmq_cmd
++            if filter_cmd:
++                shell_cmd = "sh -c '%s'" % (rpmq_cmd + "|" + filter_cmd)
++            self.add_cmd_output(shell_cmd, root_symlink=symlink,
++                                suggest_filename=suggest)
++
+         if self.get_option("rpmq"):
++            # basic installed-rpms
+             query_fmt = '"%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}~~'
+-            query_fmt = query_fmt + '%{INSTALLTIME:date}\t%{INSTALLTIME}\t'
+-            query_fmt = query_fmt + '%{VENDOR}\t%{BUILDHOST}\t'
+-            query_fmt = query_fmt + '%{SIGPGP}\t%{SIGPGP:pgpsig}\n"'
+-            rpmq_cmd = "rpm --nodigest -qa --qf=%s" % query_fmt
++            query_fmt = query_fmt + '%{INSTALLTIME:date}\n"'
++
+             filter_cmd = 'awk -F "~~" ' \
+-                '"{printf \\"%-59s %s\\n\\",\$1,\$2}"|sort'
+-            shell_cmd = "sh -c '%s'" % (rpmq_cmd + "|" + filter_cmd)
+-            self.add_cmd_output(shell_cmd, root_symlink="installed-rpms")
++                '"{printf \\"%-59s %s\\n\\",\$1,\$2}"|sort -f'
++
++            add_rpm_cmd(query_fmt, filter_cmd, "installed-rpms", None)
++
++            # extended package data
++            query_fmt = '"%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\\t'
++            query_fmt = query_fmt + '%{INSTALLTIME:date}\\t%{INSTALLTIME}\\t'
++            query_fmt = query_fmt + '%{VENDOR}\\t%{BUILDHOST}\\t'
++            query_fmt = query_fmt + '%{SIGPGP}\\t%{SIGPGP:pgpsig}\\n"'
++
++            add_rpm_cmd(query_fmt, None, None, "package-data")
+ 
+         if self.get_option("verify"):
+             if self.get_option("rpmva"):
+-- 
+1.8.3.1
+

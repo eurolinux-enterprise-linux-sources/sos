@@ -1,0 +1,100 @@
+From 3a2ad99c71dae022cfb7fb02e11473001c50ae23 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 27 Jan 2015 13:07:52 +0000
+Subject: [PATCH] [policies] run PackageManager query_command under timeout
+
+PackageManager query commands may block due to file system locks
+or problems with the package database. Run the query command with
+a timeout of 30s and exit if the timeout expires.
+
+Signed-off-by: Aruna Balakrishnaiah <aruna@linux.vnet.ibm.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+
+---
+Changes from v3:
+	Add default timeout instead of making it configurable
+	Add print function instead of error()
+
+Changes from v2:
+	Introduce timeout in shell_out wrapper
+
+Changes from v1:
+	Addressed issues of the maintainer
+	Introduce timeout instead of relying on yum.
+---
+ sos/policies/__init__.py |  3 ++-
+ sos/policies/redhat.py   | 10 +++++++++-
+ sos/utilities.py         |  4 ++--
+ 3 files changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/sos/policies/__init__.py b/sos/policies/__init__.py
+index 9fcbd55..34a2f6a 100644
+--- a/sos/policies/__init__.py
++++ b/sos/policies/__init__.py
+@@ -56,6 +56,7 @@ class PackageManager(object):
+     """
+ 
+     query_command = None
++    timeout = 30
+ 
+     def __init__(self, query_command=None):
+         self.packages = {}
+@@ -92,7 +93,7 @@ class PackageManager(object):
+                           version': 'major.minor.version'}}
+         """
+         if self.query_command:
+-            pkg_list = shell_out(self.query_command).splitlines()
++            pkg_list = shell_out(self.query_command, self.timeout).splitlines()
+             for pkg in pkg_list:
+                 if '|' not in pkg:
+                     continue
+diff --git a/sos/policies/redhat.py b/sos/policies/redhat.py
+index 2219246..38510d9 100644
+--- a/sos/policies/redhat.py
++++ b/sos/policies/redhat.py
+@@ -15,6 +15,7 @@
+ # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ 
+ # This enables the use of with syntax in python 2.5 (e.g. jython)
++from __future__ import print_function
+ import os
+ import sys
+ 
+@@ -46,8 +47,15 @@ class RedHatPolicy(LinuxPolicy):
+             'rpm -qa --queryformat "%{NAME}|%{VERSION}\\n"')
+         self.valid_subclasses = [RedHatPlugin]
+ 
++        pkgs = self.package_manager.all_pkgs()
++
++        # If rpm query timed out after timeout duration exit
++        if not pkgs:
++            print("Could not obtain installed package list", file=sys.stderr)
++            sys.exit(1)
++
+         # handle PATH for UsrMove
+-        if self.package_manager.all_pkgs()['filesystem']['version'][0] == '3':
++        if pkgs['filesystem']['version'][0] == '3':
+             self.PATH = "/usr/sbin:/usr/bin:/root/bin"
+         else:
+             self.PATH = "/sbin:/bin:/usr/sbin:/usr/bin:/root/bin"
+diff --git a/sos/utilities.py b/sos/utilities.py
+index 51909c6..2638ce4 100644
+--- a/sos/utilities.py
++++ b/sos/utilities.py
+@@ -180,11 +180,11 @@ def import_module(module_fqname, superclasses=None):
+     return modules
+ 
+ 
+-def shell_out(cmd, runat=None):
++def shell_out(cmd, timeout=30, runat=None):
+     """Shell out to an external command and return the output or the empty
+     string in case of error.
+     """
+-    return sos_get_command_output(cmd, runat=runat)['output']
++    return sos_get_command_output(cmd, timeout=timeout, runat=runat)['output']
+ 
+ 
+ class ImporterHelper(object):
+-- 
+1.8.3.1
+

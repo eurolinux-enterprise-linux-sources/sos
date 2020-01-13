@@ -1,0 +1,30 @@
+From ed8c59e9fd6adcfc8f00a05e68d07deb98252053 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Fri, 1 Feb 2019 09:19:56 +0100
+Subject: [PATCH] [satellite] don't collect /root/ssl-build
+
+Recursive listing of the directory is sufficient.
+
+Resolves: #1555
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/satellite.py |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/sos/plugins/satellite.py b/sos/plugins/satellite.py
+index 26dbc0e..c50c2ec 100644
+--- a/sos/plugins/satellite.py
++++ b/sos/plugins/satellite.py
+@@ -63,7 +63,7 @@ class Satellite(Plugin, RedHatPlugin):
+             "/var/log/nocpulse/TSDBLocalQueue/TSDBLocalQueue.log"
+         ])
+ 
+-        self.add_copy_spec("/root/ssl-build")
++        self.add_cmd_output("ls -lanR /root/ssl-build")
+         self.add_cmd_output("rhn-schema-version",
+                             root_symlink="database-schema-version")
+         self.add_cmd_output("rhn-charsets",
+-- 
+1.7.1
+

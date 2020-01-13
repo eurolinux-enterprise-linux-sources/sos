@@ -1,0 +1,343 @@
+diff -up sos-3.2.nosixforbryn/sos/archive.py.orig sos-3.2.nosixforbryn/sos/archive.py
+--- sos-3.2.nosixforbryn/sos/archive.py.orig	2015-03-02 20:03:32.585430036 +0000
++++ sos-3.2.nosixforbryn/sos/archive.py	2015-03-02 20:03:57.472599185 +0000
+@@ -34,11 +34,6 @@ try:
+ except ImportError:
+     pass
+ 
+-# PYCOMPAT
+-import six
+-if six.PY3:
+-    long = int
+-
+ 
+ class Archive(object):
+     """Abstract base class for archives."""
+@@ -375,10 +370,7 @@ class TarFileArchive(FileCacheArchive):
+ 
+     def _build_archive(self):
+         # python2.6 TarFile lacks the filter parameter
+-        if not six.PY3 and sys.version_info[1] < 7:
+-            tar = _TarFile.open(self._archive_name, mode="w")
+-        else:
+-            tar = tarfile.open(self._archive_name, mode="w")
++        tar = _TarFile.open(self._archive_name, mode="w")
+         # we need to pass the absolute path to the archive root but we
+         # want the names used in the archive to be relative.
+         tar.add(self._archive_root, arcname=os.path.split(self._name)[1],
+diff -up sos-3.2.nosixforbryn/sos/plugins/__init__.py.orig sos-3.2.nosixforbryn/sos/plugins/__init__.py
+--- sos-3.2.nosixforbryn/sos/plugins/__init__.py.orig	2015-03-02 20:03:32.587430050 +0000
++++ sos-3.2.nosixforbryn/sos/plugins/__init__.py	2015-03-02 20:03:57.472599185 +0000
+@@ -28,10 +28,6 @@ from time import time
+ import logging
+ import fnmatch
+ 
+-# PYCOMPAT
+-import six
+-from six.moves import zip, filter
+-
+ 
+ def regex_findall(regex, fname):
+     '''Return a list of all non overlapping matches in the string(s)'''
+@@ -392,7 +388,7 @@ class Plugin(object):
+                 if val is not None:
+                     return val
+ 
+-        items = six.iteritems(self.commons.get('global_plugin_options', {}))
++        items = self.commons.get('global_plugin_options', {}).iteritems()
+         for key, value in items:
+             if _check(key):
+                 return value
+@@ -450,7 +446,7 @@ class Plugin(object):
+         """Add a file specification (can be file, dir,or shell glob) to be
+         copied into the sosreport by this module.
+         """
+-        if isinstance(copyspecs, six.string_types):
++        if isinstance(copyspecs, basestring):
+             copyspecs = [copyspecs]
+         for copyspec in copyspecs:
+             if not (copyspec and len(copyspec)):
+@@ -486,7 +482,7 @@ class Plugin(object):
+     def add_cmd_output(self, cmds, suggest_filename=None,
+                        root_symlink=None, timeout=300, runat=None):
+         """Run a program or a list of programs and collect the output"""
+-        if isinstance(cmds, six.string_types):
++        if isinstance(cmds, basestring):
+             cmds = [cmds]
+         if len(cmds) > 1 and (suggest_filename or root_symlink):
+             self._log_warn("ambiguous filename or symlink for command list")
+@@ -653,10 +649,10 @@ class Plugin(object):
+         """
+         # some files or packages have been specified for this package
+         if self.files or self.packages:
+-            if isinstance(self.files, six.string_types):
++            if isinstance(self.files, basestring):
+                 self.files = [self.files]
+ 
+-            if isinstance(self.packages, six.string_types):
++            if isinstance(self.packages, basestring):
+                 self.packages = [self.packages]
+ 
+             return (any(os.path.exists(fname) for fname in self.files) or
+diff -up sos-3.2.nosixforbryn/sos/plugins/navicli.py.orig sos-3.2.nosixforbryn/sos/plugins/navicli.py
+--- sos-3.2.nosixforbryn/sos/plugins/navicli.py.orig	2015-03-02 20:03:32.589430063 +0000
++++ sos-3.2.nosixforbryn/sos/plugins/navicli.py	2015-03-02 20:29:31.731026970 +0000
+@@ -18,10 +18,6 @@ from sos.plugins import Plugin, RedHatPl
+ from sos.utilities import is_executable
+ 
+ 
+-# Just for completeness sake.
+-from six.moves import input
+-
+-
+ class Navicli(Plugin, RedHatPlugin):
+     """ EMC Navicli
+     """
+@@ -70,7 +66,7 @@ class Navicli(Plugin, RedHatPlugin):
+         CLARiiON_IP_loop = "stay_in"
+         while CLARiiON_IP_loop == "stay_in":
+             try:
+-                ans = input("CLARiiON SP IP Address or [Enter] to exit: ")
++                ans = raw_input("CLARiiON SP IP Address or [Enter] to exit: ")
+             except:
+                 return
+             if self.check_ext_prog("navicli -h %s getsptime" % (ans,)):
+diff -up sos-3.2.nosixforbryn/sos/plugins/xfs.py.orig sos-3.2.nosixforbryn/sos/plugins/xfs.py
+--- sos-3.2.nosixforbryn/sos/plugins/xfs.py.orig	2015-03-02 20:03:32.591430077 +0000
++++ sos-3.2.nosixforbryn/sos/plugins/xfs.py	2015-03-02 20:03:57.473599192 +0000
+@@ -13,7 +13,6 @@
+ # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ 
+ from sos.plugins import Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin
+-from six.moves import zip
+ 
+ 
+ class Xfs(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
+diff -up sos-3.2.nosixforbryn/sos/policies/__init__.py.orig sos-3.2.nosixforbryn/sos/policies/__init__.py
+--- sos-3.2.nosixforbryn/sos/policies/__init__.py.orig	2015-03-02 20:10:48.558393183 +0000
++++ sos-3.2.nosixforbryn/sos/policies/__init__.py	2015-03-02 20:29:02.002824919 +0000
+@@ -1,4 +1,5 @@
+ from __future__ import with_statement
++from __future__ import print_function
+ 
+ import os
+ import re
+@@ -16,8 +17,7 @@ from sos.plugins import IndependentPlugi
+ from sos import _sos as _
+ import hashlib
+ from textwrap import fill
+-from six import print_
+-from six.moves import input
++print_ = print
+ 
+ 
+ def import_policy(name):
+@@ -406,10 +406,10 @@ class LinuxPolicy(Policy):
+         if not self.commons['cmdlineopts'].batch and not \
+                 self.commons['cmdlineopts'].quiet:
+             try:
+-                self.report_name = input(_("Please enter your first initial "
++                self.report_name = raw_input(_("Please enter your first initial "
+                                          "and last name [%s]: ") % localname)
+ 
+-                self.case_id = input(_("Please enter the case id "
++                self.case_id = raw_input(_("Please enter the case id "
+                                        "that you are generating this "
+                                        "report for: "))
+                 self._print()
+diff -up sos-3.2.nosixforbryn/sos/reporting.py.orig sos-3.2.nosixforbryn/sos/reporting.py
+--- sos-3.2.nosixforbryn/sos/reporting.py.orig	2015-03-02 20:03:32.593430090 +0000
++++ sos-3.2.nosixforbryn/sos/reporting.py	2015-03-02 20:03:57.473599192 +0000
+@@ -24,9 +24,6 @@ try:
+ except ImportError:
+     import simplejson as json
+ 
+-# PYCOMPAT
+-from six import iteritems
+-
+ 
+ class Node(object):
+ 
+@@ -140,8 +137,7 @@ class PlainTextReport(object):
+ 
+     def __str__(self):
+         self.buf = buf = []
+-        for section_name, section_contents in sorted(iteritems(
+-                self.report_node.data)):
++        for section_name, section_contents in sorted(self.report_node.data.iteritems()):
+             buf.append(section_name + "\n" + self.DIVIDER)
+             for type_, format_, header in self.subsections:
+                 self.process_subsection(section_contents, type_.ADDS_TO,
+diff -up sos-3.2.nosixforbryn/sos/sosreport.py.orig sos-3.2.nosixforbryn/sos/sosreport.py
+--- sos-3.2.nosixforbryn/sos/sosreport.py.orig	2015-03-02 20:03:32.595430104 +0000
++++ sos-3.2.nosixforbryn/sos/sosreport.py	2015-03-02 20:28:46.569720026 +0000
+@@ -21,6 +21,7 @@ supplied for application-specific inform
+ # along with this program; if not, write to the Free Software
+ # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ 
++from __future__ import print_function
+ import sys
+ import traceback
+ import os
+@@ -41,14 +42,8 @@ from sos.archive import TarFileArchive,
+ from sos.reporting import (Report, Section, Command, CopiedFile, CreatedFile,
+                            Alert, Note, PlainTextReport)
+ 
+-# PYCOMPAT
+-import six
+-from six.moves import zip, input
+-if six.PY3:
+-    from configparser import ConfigParser
+-else:
+-    from ConfigParser import ConfigParser
+-from six import print_
++from ConfigParser import ConfigParser
++print_ = print
+ 
+ # file system errors that should terminate a run
+ fatal_fs_errors = (errno.ENOSPC, errno.EROFS)
+@@ -1066,7 +1061,7 @@ class SoSReport(object):
+             msg = self.policy.get_msg()
+             msg += _("Press ENTER to continue, or CTRL-C to quit.\n")
+             try:
+-                input(msg)
++                raw_input(msg)
+             except:
+                 self.ui_log.info("")
+                 self._exit()
+diff -up sos-3.2.nosixforbryn/sos/utilities.py.orig sos-3.2.nosixforbryn/sos/utilities.py
+--- sos-3.2.nosixforbryn/sos/utilities.py.orig	2015-03-02 20:03:32.597430118 +0000
++++ sos-3.2.nosixforbryn/sos/utilities.py	2015-03-02 20:03:57.473599192 +0000
+@@ -27,9 +27,7 @@ import shlex
+ 
+ from contextlib import closing
+ 
+-# PYCOMPAT
+-import six
+-from six import StringIO
++from StringIO import StringIO
+ 
+ 
+ def tail(filename, number_of_bytes):
+@@ -42,7 +40,7 @@ def tail(filename, number_of_bytes):
+ 
+ def fileobj(path_or_file, mode='r'):
+     """Returns a file-like object that can be used as a context manager"""
+-    if isinstance(path_or_file, six.string_types):
++    if isinstance(path_or_file, basestring):
+         try:
+             return open(path_or_file, mode)
+         except:
+@@ -138,9 +136,7 @@ def sos_get_command_output(command, time
+     if timeout and is_executable("timeout"):
+         command = "timeout %ds %s" % (timeout, command)
+ 
+-    # shlex.split() reacts badly to unicode on older python runtimes.
+-    if not six.PY3:
+-        command = command.encode('utf-8', 'ignore')
++    command = command.encode('utf-8', 'ignore')
+     args = shlex.split(command)
+     try:
+         p = Popen(args, shell=False, stdout=PIPE, stderr=STDOUT,
+@@ -157,7 +153,7 @@ def sos_get_command_output(command, time
+     # Required hack while we still pass shell=True to Popen; a Popen
+     # call with shell=False for a non-existant binary will raise OSError.
+     if p.returncode == 126 or p.returncode == 127:
+-        stdout = six.binary_type(b"")
++        stdout = ""
+ 
+     return {
+         'status': p.returncode,
+diff -up sos-3.2.nosixforbryn/tests/archive_tests.py.orig sos-3.2.nosixforbryn/tests/archive_tests.py
+--- sos-3.2.nosixforbryn/tests/archive_tests.py.orig	2015-03-02 20:07:44.243140460 +0000
++++ sos-3.2.nosixforbryn/tests/archive_tests.py	2015-03-02 20:05:46.257338555 +0000
+@@ -9,8 +9,6 @@ import shutil
+ 
+ from sos.archive import TarFileArchive, ZipFileArchive
+ 
+-# PYCOMPAT
+-import six
+ 
+ class ZipFileArchiveTest(unittest.TestCase):
+ 
+@@ -35,7 +33,7 @@ class ZipFileArchiveTest(unittest.TestCa
+         self.check_for_file('tests/ziptest')
+ 
+     def test_add_unicode_file(self):
+-        self.zf.add_file(six.u('tests/'))
++        self.zf.add_file('tests/')
+         self.zf.close()
+ 
+         self.check_for_file('tests/ziptest')
+@@ -68,14 +66,14 @@ class ZipFileArchiveTest(unittest.TestCa
+         self.zf.add_string('this is my content', 'tests/string_test.txt')
+ 
+         afp = self.zf.open_file('tests/string_test.txt')
+-        self.assertEquals(six.b('this is my content'), afp.read())
++        self.assertEquals('this is my content', afp.read())
+ 
+     def test_overwrite_file(self):
+         self.zf.add_string('this is my content', 'tests/string_test.txt')
+         self.zf.add_string('this is my new content', 'tests/string_test.txt')
+ 
+         afp = self.zf.open_file('tests/string_test.txt')
+-        self.assertEquals(six.b('this is my new content'), afp.read())
++        self.assertEquals('this is my new content', afp.read())
+ 
+ # Disabled as new api doesnt provide a add_link routine
+ #    def test_make_link(self):
+diff -up sos-3.2.nosixforbryn/tests/plugin_tests.py.orig sos-3.2.nosixforbryn/tests/plugin_tests.py
+--- sos-3.2.nosixforbryn/tests/plugin_tests.py.orig	2015-03-02 20:07:25.069010141 +0000
++++ sos-3.2.nosixforbryn/tests/plugin_tests.py	2015-03-02 20:06:12.899519631 +0000
+@@ -2,12 +2,7 @@ import unittest
+ import os
+ import tempfile
+ 
+-# PYCOMPAT
+-import six
+-try:
+-    from StringIO import StringIO
+-except:
+-    from io import StringIO
++from StringIO import StringIO
+ 
+ from sos.plugins import Plugin, regex_findall, _mangle_command
+ from sos.archive import TarFileArchive, ZipFileArchive
+@@ -20,7 +15,7 @@ def j(filename):
+ 
+ def create_file(size):
+    f = tempfile.NamedTemporaryFile(delete=False)
+-   f.write(six.b("*" * size * 1024 * 1024))
++   f.write("*" * size * 1024 * 1024)
+    f.flush()
+    f.close()
+    return f.name
+diff -up sos-3.2.nosixforbryn/tests/utilities_tests.py.orig sos-3.2.nosixforbryn/tests/utilities_tests.py
+--- sos-3.2.nosixforbryn/tests/utilities_tests.py.orig	2015-03-02 20:07:11.913920731 +0000
++++ sos-3.2.nosixforbryn/tests/utilities_tests.py	2015-03-02 20:06:32.666653981 +0000
+@@ -1,9 +1,7 @@
+ import os.path
+ import unittest
+ 
+-# PYCOMPAT
+-import six
+-from six import StringIO
++from StringIO import StringIO
+ 
+ from sos.utilities import grep, get_hash_name, is_executable, sos_get_command_output, find, tail, shell_out
+ import sos
+@@ -35,12 +33,12 @@ class TailTest(unittest.TestCase):
+ 
+     def test_tail(self):
+         t = tail("tests/tail_test.txt", 10)
+-        self.assertEquals(t, six.b("last line\n"))
++        self.assertEquals(t, "last line\n")
+ 
+     def test_tail_too_many(self):
+         t = tail("tests/tail_test.txt", 200)
+         expected = open("tests/tail_test.txt", "r").read()
+-        self.assertEquals(t, six.b(expected))
++        self.assertEquals(t, expected)
+ 
+ 
+ class ExecutableTest(unittest.TestCase):

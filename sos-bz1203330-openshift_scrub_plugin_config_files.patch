@@ -1,0 +1,37 @@
+From c2cbf114dcee670b2d416ec6428a66730a821c47 Mon Sep 17 00:00:00 2001
+From: tiwillia@redhat.com <tiwillia@redhat.com>
+Date: Fri, 17 Apr 2015 10:24:35 -0400
+Subject: [PATCH] [openshift] Obfuscate only DNS plugin credential values
+
+Obfuscate only the value, not the entire directive and value pair.
+
+Signed-off-by: Timothy Williams <tiwillia@redhat.com>
+---
+ sos/plugins/openshift.py |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/sos/plugins/openshift.py b/sos/plugins/openshift.py
+index 66d15e8..f557de7 100644
+--- a/sos/plugins/openshift.py
++++ b/sos/plugins/openshift.py
+@@ -138,14 +138,14 @@ class Openshift(Plugin, RedHatPlugin):
+         plugin_dir = '/etc/openshift/plugins.d/'
+         self.do_file_sub(plugin_dir + 'openshift-origin-dns-dynect.conf',
+                          r"(DYNECT_PASSWORD\s*=\s*)(.*)",
+-                         r"********")
++                         r"\1********")
+         # Fog cloud: FOG_RACKSPACE_API_KEY="apikey"
+         self.do_file_sub(plugin_dir + 'openshift-origin-dns-fog.conf',
+                          r"(FOG_RACKSPACE_API_KEY\s*=\s*)(.*)",
+-                         r"********")
++                         r"\1********")
+         # ISC bind: BIND_KEYVALUE="rndc key"
+         self.do_file_sub(plugin_dir + 'openshift-origin-dns-nsupdate.conf',
+                          r"(BIND_KEYVALUE\s*=\s*)(.*)",
+-                         r"********")
++                         r"\1********")
+ 
+ # vim: et ts=4 sw=4
+-- 
+1.7.1
+

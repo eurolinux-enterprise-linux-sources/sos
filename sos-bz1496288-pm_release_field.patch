@@ -1,0 +1,64 @@
+From 6e69e104e51ed51f5bf44f5379ac225043d41238 Mon Sep 17 00:00:00 2001
+From: Bryn M. Reeves <bmr@redhat.com>
+Date: Tue, 20 Feb 2018 14:31:54 +0000
+Subject: [PATCH] [policy] add optional 'release' value for packages
+
+An a new optional field to the data gathered for installed packages
+to include the 'release' string provided by the platform package
+manager, and implement a change to the redhat policy family to
+add this to the RPM query command for those distributions.
+
+Policies wishing to implement this just need to ensure that there
+is an additional '|' separated field in the data returned by the
+specified query command. If the additional field is present it is
+assumed to contain a release value and is stored in the package
+dictionary for the 'release' key.
+
+For policies that do not define the additional field in query
+commands the 'release' key will always be set to None.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/policies/__init__.py |    8 +++++++-
+ sos/policies/redhat.py   |    2 +-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/sos/policies/__init__.py b/sos/policies/__init__.py
+index dc04310..559e4fb 100644
+--- a/sos/policies/__init__.py
++++ b/sos/policies/__init__.py
+@@ -110,11 +110,17 @@ class PackageManager(object):
+             for pkg in pkg_list:
+                 if '|' not in pkg:
+                     continue
+-                name, version = pkg.split("|")
++                elif pkg.count("|") == 1:
++                    name, version = pkg.split("|")
++                    release = None
++                elif pkg.count("|") == 2:
++                    name, version, release = pkg.split("|")
+                 self.packages[name] = {
+                     'name': name,
+                     'version': version.split(".")
+                 }
++                release = release if release else None
++                self.packages[name]['release'] = release
+ 
+         return self.packages
+ 
+diff --git a/sos/policies/redhat.py b/sos/policies/redhat.py
+index 86a1e74..4deadcc 100644
+--- a/sos/policies/redhat.py
++++ b/sos/policies/redhat.py
+@@ -44,7 +44,7 @@ class RedHatPolicy(LinuxPolicy):
+         self.report_name = ""
+         self.ticket_number = ""
+         self.package_manager = PackageManager(
+-            'rpm -qa --queryformat "%{NAME}|%{VERSION}\\n"')
++            'rpm -qa --queryformat "%{NAME}|%{VERSION}|%{RELEASE}\\n"')
+         self.valid_subclasses = [RedHatPlugin]
+ 
+         pkgs = self.package_manager.all_pkgs()
+-- 
+1.7.1
+

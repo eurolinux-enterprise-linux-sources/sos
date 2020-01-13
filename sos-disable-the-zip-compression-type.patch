@@ -1,0 +1,60 @@
+From 081e1ce9f9ad7570d057babd81b474fd407149d7 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 9 Dec 2014 17:32:45 +0000
+Subject: [PATCH] [sosreport] disable the 'zip' compression type
+
+The Zip archive format is little used and has been broken for
+some time:
+
+   Unexpected exception setting up archive:
+  Traceback (most recent call last):
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1092, in prework
+      self._set_archive()
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 679, in _set_archive
+      self.archive = ZipFileArchive(archive_name, self.tmpdir)
+  TypeError: __init__() takes exactly 2 arguments (3 given)
+  __init__() takes exactly 2 arguments (3 given)
+
+Remove it from the allowed options list for --compression-type.
+
+The supporting Archive classes can be removed in a separate commit.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/sosreport.py | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index 99b5f47..a697380 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -599,7 +599,7 @@ class SoSOptions(object):
+                           dest="report",
+                           help="Disable HTML/XML reporting", default=False)
+         parser.add_option("-z", "--compression-type", dest="compression_type",
+-                          help="compression technology to use [auto, zip, "
++                          help="compression technology to use [auto, "
+                                "gzip, bzip2, xz] (default=auto)",
+                           default="auto")
+ 
+@@ -675,8 +675,6 @@ class SoSReport(object):
+         if self.opts.compression_type == 'auto':
+             auto_archive = self.policy.get_preferred_archive()
+             self.archive = auto_archive(archive_name, self.tmpdir)
+-        elif self.opts.compression_type == 'zip':
+-            self.archive = ZipFileArchive(archive_name, self.tmpdir)
+         else:
+             self.archive = TarFileArchive(archive_name, self.tmpdir)
+         self.archive.set_debug(True if self.opts.debug else False)
+@@ -1080,7 +1078,7 @@ class SoSReport(object):
+         self.policy.pre_work()
+         try:
+             self.ui_log.info(_(" Setting up archive ..."))
+-            compression_methods = ('auto', 'zip', 'bzip2', 'gzip', 'xz')
++            compression_methods = ('auto', 'bzip2', 'gzip', 'xz')
+             method = self.opts.compression_type
+             if method not in compression_methods:
+                 compression_list = ', '.join(compression_methods)
+-- 
+1.9.3
+

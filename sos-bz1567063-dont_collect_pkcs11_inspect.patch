@@ -1,0 +1,33 @@
+From 08458f8637528b71beed573c1f13e36d15c4d18a Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Wed, 28 Jun 2017 09:43:55 +0200
+Subject: [PATCH] [smartcard] Stop collecting pkcs11_inspect debug
+
+The tool always requires PIN to be entered manually. That contradicts the aim
+of sosreport to collect data as automatically as possible.
+
+Once smartcar community allows providing the PIN e.g. via an env.variable,
+we can add the command back.
+
+Resolves: #1045
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/smartcard.py |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/sos/plugins/smartcard.py b/sos/plugins/smartcard.py
+index 9a5afb7..746b0ae 100644
+--- a/sos/plugins/smartcard.py
++++ b/sos/plugins/smartcard.py
+@@ -33,7 +33,6 @@ class Smartcard(Plugin, RedHatPlugin):
+             "/etc/reader.conf.d/",
+             "/etc/pam_pkcs11/"])
+         self.add_cmd_output([
+-            "pkcs11_inspect debug",
+             "pklogin_finder debug",
+             "ls -nl /usr/lib*/pam_pkcs11/"
+         ])
+-- 
+1.7.1
+

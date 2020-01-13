@@ -1,0 +1,31 @@
+From b6e1852d7178ed254caca5ef90657ed879aca3e0 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Sun, 31 May 2015 14:31:58 +0200
+Subject: [PATCH] [boot] Collect efibootmgr output
+
+Resolves #551
+Closes #568
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+Signed-off-by: Adam Stokes <adam.stokes@ubuntu.com>
+---
+ sos/plugins/boot.py | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/sos/plugins/boot.py b/sos/plugins/boot.py
+index 8acf571..68cb3c7 100644
+--- a/sos/plugins/boot.py
++++ b/sos/plugins/boot.py
+@@ -40,6 +40,9 @@ class Boot(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
+             "ls -lanR /boot",
+             "lsinitrd"
+         ])
++
++        self.add_cmd_output("efibootmgr")
++
+         if self.get_option("all-images"):
+             for image in glob('/boot/initr*.img'):
+                 if image[-9:] == "kdump.img":
+-- 
+1.8.3.1
+

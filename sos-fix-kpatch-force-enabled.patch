@@ -1,0 +1,33 @@
+From 6b43c42078604b0551923c2801108848e97ba3b9 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 14 Oct 2014 15:43:20 +0100
+Subject: [PATCH] [kpatch] do not try to read kpatch data if it could not be
+ run
+
+Everything the kpatch plugin does requires the list of available
+kpatch patches obtained from 'kpatch list'. If this fails return
+immediately from the setup method.
+
+Fixes #417.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/kpatch.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/sos/plugins/kpatch.py b/sos/plugins/kpatch.py
+index 7909926..6ef557e 100644
+--- a/sos/plugins/kpatch.py
++++ b/sos/plugins/kpatch.py
+@@ -27,6 +27,8 @@ class Kpatch(Plugin, RedHatPlugin):
+ 
+     def setup(self):
+         kpatch_list = self.get_cmd_output_now("kpatch list")
++        if not kpatch_list:
++            return
+         kpatches = open(kpatch_list, "r").read().splitlines()
+         for patch in kpatches:
+             if not re.match("^kpatch-.*\(.*\)", patch):
+-- 
+1.9.3
+

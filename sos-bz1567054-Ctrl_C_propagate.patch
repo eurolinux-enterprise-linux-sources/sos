@@ -1,0 +1,43 @@
+From 8b3b8acd47da70a5d92fcde1c4919f8558a15e29 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Wed, 6 Sep 2017 15:11:12 +0200
+Subject: [PATCH] [policies] stop execution on Ctrl+C during user input
+
+When pressing Ctrl+C during user input (name and case id), sosreport
+treats that as an empty string and starts to collect data. It must
+terminate instead.
+
+Catch the KeyboardIntterupt, print a newline (to avoid munging the
+terminal too much), and then re-raise the exception to cause the
+process to exit.
+
+Allow all other exceptions to propagate up and do not attempt to
+continue.
+
+Resolves: #1094
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/policies/__init__.py |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sos/policies/__init__.py b/sos/policies/__init__.py
+index a641e45..52afc82 100644
+--- a/sos/policies/__init__.py
++++ b/sos/policies/__init__.py
+@@ -432,9 +432,9 @@ class LinuxPolicy(Policy):
+                                        "that you are generating this "
+                                        "report for [%s]: ") % caseid)
+                 self._print()
+-            except:
++            except KeyboardInterrupt:
+                 self._print()
+-                self.report_name = localname
++                raise
+ 
+         if len(self.report_name) == 0:
+             self.report_name = localname
+-- 
+1.7.1
+

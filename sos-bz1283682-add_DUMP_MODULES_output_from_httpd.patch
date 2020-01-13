@@ -1,0 +1,14 @@
+diff -up sos-3.2/sos/plugins/apache.py.org sos-3.2/sos/plugins/apache.py
+--- sos-3.2/sos/plugins/apache.py.org	2016-10-17 11:04:16.550375310 -0400
++++ sos-3.2/sos/plugins/apache.py	2016-10-17 11:04:42.564210899 -0400
+@@ -25,6 +25,10 @@ class Apache(Plugin):
+         ("log", "gathers all apache logs", "slow", False)
+     ]
+ 
++    def setup(self):
++        # collect list of installed modules
++        self.add_cmd_output(["apachectl -M"])
++
+ 
+ class RedHatApache(Apache, RedHatPlugin):
+     files = ('/etc/httpd/conf/httpd.conf',)

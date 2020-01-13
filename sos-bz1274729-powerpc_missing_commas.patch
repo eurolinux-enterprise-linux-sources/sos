@@ -1,0 +1,30 @@
+From ce1af8e84a479b10960eb421340fdd8df60ffd29 Mon Sep 17 00:00:00 2001
+From: Martin Frodl <mfrodl@redhat.com>
+Date: Mon, 26 Oct 2015 10:24:06 +0100
+Subject: [PATCH] [powerpc] fix missing commas in copy spec list
+
+Fixes: #671.
+
+Signed-off-by: Martin Frodl <mfrodl@redhat.com>
+---
+ sos/plugins/powerpc.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/powerpc.py b/sos/plugins/powerpc.py
+index 051c237..9252cf2 100644
+--- a/sos/plugins/powerpc.py
++++ b/sos/plugins/powerpc.py
+@@ -83,8 +83,8 @@ class PowerPC(Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin):
+         if isPowerNV:
+             self.add_copy_spec([
+                 "/proc/ppc64/eeh",
+-                "/proc/ppc64/systemcfg"
+-                "/proc/ppc64/topology_updates"
++                "/proc/ppc64/systemcfg",
++                "/proc/ppc64/topology_updates",
+                 "/sys/firmware/opal/msglog",
+                 "/var/log/opal-elog/"
+             ])
+-- 
+1.8.3.1
+

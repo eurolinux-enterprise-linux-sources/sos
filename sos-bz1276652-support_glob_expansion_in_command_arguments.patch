@@ -1,0 +1,29 @@
+diff -up sos-3.2/sos/utilities.py.org sos-3.2/sos/utilities.py
+--- sos-3.2/sos/utilities.py.org	2016-02-02 09:59:08.264193165 -0500
++++ sos-3.2/sos/utilities.py	2016-02-02 10:00:16.374667781 -0500
+@@ -24,6 +24,7 @@ import logging
+ import fnmatch
+ import errno
+ import shlex
++import glob
+ 
+ from contextlib import closing
+ 
+@@ -126,8 +127,16 @@ def sos_get_command_output(command, time
+ 
+     command = command.encode('utf-8', 'ignore')
+     args = shlex.split(command)
++    # Expand arguments that are wildcard paths.
++    expanded_args = []
++    for arg in args:
++        expanded_arg = glob.glob(arg)
++        if expanded_arg:
++            expanded_args.extend(expanded_arg)
++        else:
++            expanded_args.append(arg)
+     try:
+-        p = Popen(args, shell=False, stdout=PIPE, stderr=STDOUT,
++        p = Popen(expanded_args, shell=False, stdout=PIPE, stderr=STDOUT,
+                   bufsize=-1, env=cmd_env, close_fds=True,
+                   preexec_fn=_child_chdir)
+     except OSError as e:

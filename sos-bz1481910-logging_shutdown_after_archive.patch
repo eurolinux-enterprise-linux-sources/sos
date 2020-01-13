@@ -1,0 +1,58 @@
+From 3f791204833783b838c35d73f74070f6c4e145a7 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Sun, 1 Jan 2017 19:10:18 +0100
+Subject: [PATCH] [sosreport][regression] --tmp-dir on NFS raises uncaught exception
+
+logging has to be shut down after the final archive is created, since archive
+class prints logs during the archive creation.
+
+Resolves: #909
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/sosreport.py |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index e79906f..fb405d9 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -77,6 +77,7 @@ class TempFileUtil(object):
+ 
+     def new(self):
+         fd, fname = tempfile.mkstemp(dir=self.tmp_dir)
++        os.close(fd)
+         fobj = open(fname, 'w')
+         self.files.append((fname, fobj))
+         return fobj
+@@ -780,9 +781,7 @@ class SoSReport(object):
+             ui_console.setLevel(logging.INFO)
+             self.ui_log.addHandler(ui_console)
+ 
+-    def _finish_logging(self):
+-        logging.shutdown()
+-
++    def _add_sos_logs(self):
+         # Make sure the log files are added before we remove the log
+         # handlers. This prevents "No handlers could be found.." messages
+         # from leaking to the console when running in --quiet mode when
+@@ -1364,7 +1363,7 @@ class SoSReport(object):
+         # files are closed and cleaned up at exit.
+         #
+         # All subsequent terminal output must use print().
+-        self._finish_logging()
++        self._add_sos_logs()
+ 
+         archive = None    # archive path
+         directory = None  # report directory path (--build)
+@@ -1447,6 +1446,7 @@ class SoSReport(object):
+         self.policy.display_results(archive, directory, checksum)
+ 
+         # clean up
++        logging.shutdown()
+         if self.tempfile_util:
+             self.tempfile_util.clean()
+         if self.tmpdir:
+-- 
+1.7.1
+

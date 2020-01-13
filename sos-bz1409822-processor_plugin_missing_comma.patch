@@ -1,0 +1,38 @@
+From fde5809bc2a2c3993060d70ce17e3007f6308df9 Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Mon, 11 Apr 2016 12:54:14 -0400
+Subject: [PATCH] [processor] Capture turbostat output
+
+The turbostat command is a topological report. This report will show
+what cstate and pstate processors are in, what the processor frequency
+is during that timeand how busy each core is. The cstate %'s tell us
+when we are saving power at the expense of performance which is useful
+for knowing if the host is optimally configured.
+
+Fixes: #802
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/processor.py | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/processor.py b/sos/plugins/processor.py
+index 37a1b27..c934e43 100644
+--- a/sos/plugins/processor.py
++++ b/sos/plugins/processor.py
+@@ -36,9 +36,10 @@ class Processor(Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin):
+             "cpupower info",
+             "cpupower idle-info",
+             "cpupower frequency-info",
+-            "cpufreq-info"
++            "cpufreq-info",
+             "cpuid",
+-            "cpuid -r"
++            "cpuid -r",
++            "turbostat --debug sleep 10"
+         ])
+ 
+         if '86' in self.policy().get_arch():
+-- 
+1.8.3.1
+

@@ -1,0 +1,32 @@
+From 06319336ac9e99ca152e7bcf884e4473bf59f2fd Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Mon, 2 Jan 2017 12:16:53 +0100
+Subject: [PATCH] [archive] compress tarball without a timeout
+
+Compressing tarball uses default 300s timeout, while sosreports with large data
+or random content can require more time to xz/gz the tarball.
+
+Resolves: #910
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/archive.py |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/sos/archive.py b/sos/archive.py
+index 463c23b..1084fbb 100644
+--- a/sos/archive.py
++++ b/sos/archive.py
+@@ -420,7 +420,8 @@ class TarFileArchive(FileCacheArchive):
+             if cmd != "gzip":
+                 cmd = "%s -1" % cmd
+             try:
+-                r = sos_get_command_output("%s %s" % (cmd, self.name()))
++                r = sos_get_command_output("%s %s" % (cmd, self.name()),
++                                           timeout=0)
+ 
+                 if r['status']:
+                     self.log_info(r['output'])
+-- 
+1.7.1
+

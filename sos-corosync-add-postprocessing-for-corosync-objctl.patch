@@ -1,0 +1,35 @@
+From 77ea53cf7c13c59c2a1f4608d59e1b9e8f4da835 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Wed, 15 Oct 2014 15:57:47 +0100
+Subject: [PATCH] [corosync] add postprocessing for corosync-objctl output
+
+The corosync-objctl command may include fence device passwords in
+its output. Remove them with the same postprocessing regex as the
+cluster plugin uses.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/corosync.py | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/sos/plugins/corosync.py b/sos/plugins/corosync.py
+index 2cd22c3..db9b547 100644
+--- a/sos/plugins/corosync.py
++++ b/sos/plugins/corosync.py
+@@ -40,6 +40,13 @@ class Corosync(Plugin):
+         ])
+         self.call_ext_prog("killall -USR2 corosync")
+ 
++    def postproc(self):
++        self.do_cmd_output_sub(
++            "corosync-objctl",
++            r"(.*fence.*\.passwd=)(.*)",
++            r"\1******"
++        )
++
+ 
+ class RedHatCorosync(Corosync, RedHatPlugin):
+ 
+-- 
+1.9.3
+

@@ -1,0 +1,31 @@
+From 988fee7e6d0c2c91cf1f2c9363d4e3cea7244163 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Thu, 2 Oct 2014 17:25:17 +0100
+Subject: [PATCH] [powerpc] allow PowerPC plugin to run on ppc64le
+
+The plugin currently tests whether policy().get_arch() is equal
+to "ppc64". On little endian PowerPC machines this method returns
+"ppc64le". Change the check_enabled() method to test whether the
+returned string contains "ppc64".
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/powerpc.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sos/plugins/powerpc.py b/sos/plugins/powerpc.py
+index 896d1d4..39b52f6 100644
+--- a/sos/plugins/powerpc.py
++++ b/sos/plugins/powerpc.py
+@@ -27,7 +27,7 @@ class PowerPC(Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin):
+     profiles = ('system', 'hardware')
+ 
+     def check_enabled(self):
+-        return (self.policy().get_arch() == "ppc64")
++        return "ppc64" in self.policy().get_arch()
+ 
+     def setup(self):
+         try:
+-- 
+1.9.3
+

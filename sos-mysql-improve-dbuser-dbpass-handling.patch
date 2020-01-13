@@ -1,0 +1,80 @@
+From 7c12e6c994b3320ef57a13e06f5c445b6bca7935 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Thu, 22 Jan 2015 15:37:15 +0000
+Subject: [PATCH] [mysql] improve handling of dbuser, dbpass and MYSQL_PWD
+
+Make sure that the mysql plugin behaves correctly when given
+different combinations of values for dbuser, dbpass and MYSQL_PWD.
+
+* If dbdump is set then either dbpass or MYSQL_PWD must be set
+* Warn if dbdump is set and dbuser or dbpass is True/False/null
+  (indicates either 'sosreport -a' or '-k mysql.dbpass')
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/mysql.py | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/sos/plugins/mysql.py b/sos/plugins/mysql.py
+index dd899a3..8dba204 100644
+--- a/sos/plugins/mysql.py
++++ b/sos/plugins/mysql.py
+@@ -24,35 +24,51 @@ class Mysql(Plugin):
+     profiles = ('services',)
+     mysql_cnf = "/etc/my.cnf"
+ 
++    pw_warn_text = " (password visible in process listings)"
++
+     option_list = [
+         ("dbuser", "username for database dumps", "", "mysql"),
+-        ("dbpass", "password for database dumps", "", False),
++        ("dbpass", "password for database dumps" + pw_warn_text, "", False),
+         ("dbdump", "collect a database dump", "", False)
+     ]
+ 
+     def setup(self):
+         super(Mysql, self).setup()
++
+         self.add_copy_spec([
+             self.mysql_cnf,
+             "/var/log/mysql/mysqld.log",
+             "/var/log/mariadb/mariadb.log",
+         ])
++
+         if self.get_option("all_logs"):
+             self.add_copy_spec([
+                 "/var/log/mysql*",
+                 "/var/log/mariadb*"
+             ])
++
+         if self.get_option("dbdump"):
++            msg = "database user name and password must be supplied"
++            dbdump_err = "mysql.dbdump: %s" % msg
++
+             dbuser = self.get_option("dbuser")
+             dbpass = self.get_option("dbpass")
+-            if isinstance(dbuser, bool) or isinstance(dbpass, bool):
+-                # sosreport -a
+-                return
++
+             if 'MYSQL_PWD' in os.environ:
+                 dbpass = os.environ['MYSQL_PWD']
++
++            if dbuser is True or dbpass is True:
++                # sosreport -a or -k mysql.{dbuser,dbpass}
++                self.soslog.warning(dbdump_err)
++                return
++
+             if not dbpass or dbpass is False:
+                 # no MySQL password
++                self.soslog.warning(dbdump_err)
+                 return
++
++            # no need to save/restore as this variable is private to
++            # the mysql plugin.
+             os.environ['MYSQL_PWD'] = dbpass
+ 
+             opts = "--user=%s --all-databases" % dbuser
+-- 
+1.9.3
+

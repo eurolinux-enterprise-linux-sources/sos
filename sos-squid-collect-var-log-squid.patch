@@ -1,0 +1,32 @@
+From d0408ac43e1ec3b114e69b2950202f87f2fcd250 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Mon, 19 Jan 2015 18:12:15 +0000
+Subject: [PATCH] [squid] collect logs from /var/log/squid
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/squid.py | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/squid.py b/sos/plugins/squid.py
+index 0d596e5..f1aea73 100644
+--- a/sos/plugins/squid.py
++++ b/sos/plugins/squid.py
+@@ -29,8 +29,12 @@ class RedHatSquid(Squid, RedHatPlugin):
+     packages = ('squid',)
+ 
+     def setup(self):
+-        self.add_copy_spec_limit("/etc/squid/squid.conf",
+-                                 sizelimit=self.get_option('log_size'))
++        log_size = self.get_option('log_size')
++        log_path = "/var/log/squid/"
++        self.add_copy_spec_limit("/etc/squid/squid.conf", sizelimit=log_size)
++        self.add_copy_spec_limit(log_path + "access.log", sizelimit=log_size)
++        self.add_copy_spec_limit(log_path + "cache.log", sizelimit=log_size)
++        self.add_copy_spec_limit(log_path + "squid.out", sizelimit=log_size)
+ 
+ 
+ class DebianSquid(Squid, DebianPlugin, UbuntuPlugin):
+-- 
+1.9.3
+

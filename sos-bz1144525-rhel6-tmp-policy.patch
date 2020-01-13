@@ -1,0 +1,12 @@
+diff -up sos-3.2.nosixforbryn/sos/policies/redhat.py.orig sos-3.2.nosixforbryn/sos/policies/redhat.py
+--- sos-3.2.nosixforbryn/sos/policies/redhat.py.orig	2015-03-02 20:16:26.467689827 +0000
++++ sos-3.2.nosixforbryn/sos/policies/redhat.py	2015-03-02 20:16:39.484778299 +0000
+@@ -36,7 +36,7 @@ class RedHatPolicy(LinuxPolicy):
+     distro = "Red Hat"
+     vendor = "Red Hat"
+     vendor_url = "http://www.redhat.com/"
+-    _tmp_dir = "/var/tmp"
++    _tmp_dir = "/tmp"
+ 
+     def __init__(self):
+         super(RedHatPolicy, self).__init__()

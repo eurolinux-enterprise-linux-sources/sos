@@ -1,0 +1,43 @@
+From c48fb67afa63d96c531bb390b859154ebf414fbe Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Wed, 6 Sep 2017 16:09:54 +0200
+Subject: [PATCH] [networking] call iptables -L only when iptable_filter module is loaded
+
+If iptables_filter kernel module isn't loaded, dont call
+"iptables -vnxL" that would load that plugin.
+
+The same applies to ip6tables as well.
+
+Resolves: #1095
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/networking.py |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/networking.py b/sos/plugins/networking.py
+index bb930ad..53f85ad 100644
+--- a/sos/plugins/networking.py
++++ b/sos/plugins/networking.py
+@@ -191,10 +191,16 @@ class Networking(Plugin):
+             "ip netns",
+             "biosdevname -d",
+             "tc -s qdisc show",
+-            "iptables -vnxL",
+-            "ip6tables -vnxL"
+         ])
+ 
++        # When iptables is called it will load the modules
++        # iptables and iptables_filter if they are not loaded.
++        # The same goes for ipv6.
++        if self.check_ext_prog("grep -q iptable_filter /proc/modules"):
++            self.add_cmd_output("iptables -vnxL")
++        if self.check_ext_prog("grep -q ip6table_filter /proc/modules"):
++            self.add_cmd_output("ip6tables -vnxL")
++
+         # There are some incompatible changes in nmcli since
+         # the release of NetworkManager >= 0.9.9. In addition,
+         # NetworkManager >= 0.9.9 will use the long names of
+-- 
+1.7.1
+

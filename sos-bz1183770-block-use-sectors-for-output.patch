@@ -1,0 +1,29 @@
+From f2d9d8d04ec2781dd515d0bb370df2ac59983b68 Mon Sep 17 00:00:00 2001
+From: Shane Bradley <sbradley@redhat.com>
+Date: Tue, 20 Jan 2015 11:08:59 -0500
+Subject: [PATCH] [block] Don't use parted human readable output - rhbz #1183770
+
+Changed the parted command to return data in sectors units
+instead of human readable form.
+
+Signed-off-by: Shane Bradley <sbradley@redhat.com>
+---
+ sos/plugins/block.py |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/sos/plugins/block.py b/sos/plugins/block.py
+index 8c73ef6..8282af5 100644
+--- a/sos/plugins/block.py
++++ b/sos/plugins/block.py
+@@ -46,7 +46,7 @@ class Block(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
+                 disk_path = os.path.join('/dev/', disk)
+                 self.add_cmd_output([
+                     "udevadm info -ap /sys/block/%s" % (disk),
+-                    "parted -s %s print" % (disk_path),
++                    "parted -s %s unit s print" % (disk_path),
+                     "fdisk -l %s" % disk_path
+                 ])
+ 
+-- 
+1.7.1
+

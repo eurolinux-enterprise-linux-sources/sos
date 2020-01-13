@@ -1,0 +1,35 @@
+From 55d5b8b3cebb2fbb1e7980649b90c91dbd7f4e55 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Fri, 10 Mar 2017 22:27:11 +0100
+Subject: [PATCH] [cluster] Scrub passwords in pcs config
+
+passwd=.. and incoming_password=.. to be obfuscated.
+
+Resolves: #957
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/plugins/cluster.py |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/sos/plugins/cluster.py b/sos/plugins/cluster.py
+index 43083df..0dac1da 100644
+--- a/sos/plugins/cluster.py
++++ b/sos/plugins/cluster.py
+@@ -169,6 +169,13 @@ class Cluster(Plugin, RedHatPlugin):
+             r"(.*fence.*\.passwd=)(.*)",
+             r"\1******"
+         )
++
++        self.do_cmd_output_sub(
++            "pcs config",
++            r"(passwd=|incoming_password=)\S+",
++            r"\1********"
++        )
++
+         if self._debugfs_cleanup and os.path.ismount(self.debugfs_path):
+             r = self.call_ext_prog("umount %s" % self.debugfs_path)
+             if r['status'] != 0:
+-- 
+1.7.1
+

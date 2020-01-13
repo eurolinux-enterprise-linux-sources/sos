@@ -1,0 +1,130 @@
+diff -up sos-3.2/sos/plugins/networking.py.org sos-3.2/sos/plugins/networking.py
+--- sos-3.2/sos/plugins/networking.py.org	2015-05-21 14:42:42.504165476 -0400
++++ sos-3.2/sos/plugins/networking.py	2015-05-21 14:43:01.947165468 -0400
+@@ -12,7 +12,7 @@
+ # along with this program; if not, write to the Free Software
+ # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ 
+-from sos.plugins import Plugin, RedHatPlugin, UbuntuPlugin
++from sos.plugins import Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin
+ import os
+ import re
+ 
+@@ -82,13 +82,14 @@ class Networking(Plugin):
+             "/etc/NetworkManager/NetworkManager.conf",
+             "/etc/NetworkManager/system-connections",
+             "/etc/dnsmasq*",
+-            "/sys/class/net/*/flags"
++            "/sys/class/net/*/flags",
++            "/etc/iproute2"
+         ])
+         self.add_forbidden_path("/proc/net/rpc/use-gss-proxy")
+         self.add_forbidden_path("/proc/net/rpc/*/channel")
+         self.add_forbidden_path("/proc/net/rpc/*/flush")
+ 
+-        self.add_cmd_output("ip -o addr", root_symlink = "ip_addr")
++        self.add_cmd_output("ip -o addr", root_symlink="ip_addr")
+         self.add_cmd_output("route -n", root_symlink="route")
+         self.collect_iptable("filter")
+         self.collect_iptable("nat")
+@@ -99,25 +100,66 @@ class Networking(Plugin):
+             "netstat -agn",
+             "ip route show table all",
+             "ip -6 route show table all",
++            "ip -4 rule",
++            "ip -6 rule",
+             "ip link",
+             "ip address",
+             "ifenslave -a",
+             "ip mroute show",
+             "ip maddr show",
+             "ip neigh show",
++            "ip neigh show nud noarp",
+             "ip netns",
+-            "nmcli general status",
+-            "nmcli connection show",
+-            "nmcli connection show active",
+-            "nmcli device status",
+-            "nmcli device show",
+-            "biosdevname -d"
++            "biosdevname -d",
++            "tc -s qdisc show",
++            "iptables -vnxL"
+         ])
++
++        # There are some incompatible changes in nmcli since
++        # the release of NetworkManager >= 0.9.9. In addition,
++        # NetworkManager >= 0.9.9 will use the long names of
++        # "nmcli" objects.
++
++        # NetworkManager >= 0.9.9 (Use long names of objects for nmcli)
++        nmcli_con_details_cmd = ""
++        nmcli_dev_details_cmd = ""
++        if self.call_ext_prog("nmcli general status")['status'] == 0:
++            self.add_cmd_output([
++                "nmcli general status",
++                "nmcli con",
++                "nmcli con show --active",
++                "nmcli dev"])
++            nmcli_con_details_cmd = "nmcli con show id"
++            nmcli_dev_details_cmd = "nmcli dev show"
++        # NetworkManager < 0.9.9 (Use short name of objects for nmcli)
++        elif self.call_ext_prog("nmcli nm status")['status'] == 0:
++            self.add_cmd_output([
++                "nmcli nm status",
++                "nmcli con",
++                "nmcli con status",
++                "nmcli dev"])
++            nmcli_con_details_cmd = "nmcli con list id"
++            nmcli_dev_details_cmd = "nmcli dev list iface"
++
++        if len(nmcli_con_details_cmd) > 0:
++            nmcli_con_show_result = self.call_ext_prog(
++                "nmcli --terse --fields NAME con")
++            if nmcli_con_show_result['status'] == 0:
++                for con in nmcli_con_show_result['output'].splitlines():
++                    self.add_cmd_output("%s '%s'" % nmcli_con_details_cmd, con)
++
++            nmcli_dev_status_result = self.call_ext_prog(
++                "nmcli --terse --fields DEVICE dev")
++            if nmcli_dev_status_result['status'] == 0:
++                for dev in nmcli_dev_status_result['output'].splitlines():
++                    self.add_cmd_output("%s '%s'" % nmcli_dev_details_cmd, dev)
++
+         ip_link_result = self.call_ext_prog("ip -o link")
+         if ip_link_result['status'] == 0:
+             for eth in self.get_eth_interfaces(ip_link_result['output']):
+                 self.add_cmd_output([
+                     "ethtool "+eth,
++                    "ethtool -d "+eth,
+                     "ethtool -i "+eth,
+                     "ethtool -k "+eth,
+                     "ethtool -S "+eth,
+@@ -134,18 +176,6 @@ class Networking(Plugin):
+                     "brctl showmacs "+br_name
+                 ])
+ 
+-        nmcli_con_show_result = self.call_ext_prog(
+-            "nmcli --terse --fields NAME con show")
+-        if nmcli_con_show_result['status'] == 0:
+-            for con in nmcli_con_show_result['output'].splitlines():
+-                self.add_cmd_output("nmcli con show conf '%s'" % con)
+-
+-        nmcli_dev_status_result = self.call_ext_prog(
+-            "nmcli --terse --fields DEVICE dev status")
+-        if nmcli_dev_status_result['status'] == 0:
+-            for dev in nmcli_dev_status_result['output'].splitlines():
+-                self.add_cmd_output("nmcli device show "+dev)
+-
+         if self.get_option("traceroute"):
+             self.add_cmd_output("/bin/traceroute -n %s" % self.trace_host)
+ 
+@@ -167,7 +197,7 @@ class RedHatNetworking(Networking, RedHa
+         super(RedHatNetworking, self).setup()
+ 
+ 
+-class UbuntuNetworking(Networking, UbuntuPlugin):
++class UbuntuNetworking(Networking, UbuntuPlugin, DebianPlugin):
+     trace_host = "archive.ubuntu.com"
+ 
+     def setup(self):

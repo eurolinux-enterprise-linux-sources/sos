@@ -1,0 +1,42 @@
+From 12ec2a4643c844a7a9bf46f3d9557e38f0ae7403 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Mon, 19 Jan 2015 18:47:03 +0000
+Subject: [PATCH] [ctdb] fix RedHatPlugin tagging use
+
+The generic Ctdb class is tagged with RedHatPlugin. This causes
+the RedHatCtdb to not execute (since only the first matching class
+is instantiated).
+
+Remove the RedHatPlugin tag from the Ctdb class and fix the
+former's call to Ctdb.setup().
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/ctdb.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/ctdb.py b/sos/plugins/ctdb.py
+index 443181c..e1bd78e 100644
+--- a/sos/plugins/ctdb.py
++++ b/sos/plugins/ctdb.py
+@@ -16,7 +16,7 @@
+ from sos.plugins import Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin
+ 
+ 
+-class Ctdb(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
++class Ctdb(Plugin, DebianPlugin, UbuntuPlugin):
+     """Samba Clustered TDB
+     """
+     packages = ('ctdb',)
+@@ -45,7 +45,7 @@ class Ctdb(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
+ 
+ class RedHatCtdb(Ctdb, RedHatPlugin):
+     def setup(self):
+-        super(RedHatCtdb, self).super()
++        super(RedHatCtdb, self).setup()
+         self.add_copy_spec("/etc/sysconfig/ctdb")
+ 
+ # vim: et ts=4 sw=4
+-- 
+1.9.3
+

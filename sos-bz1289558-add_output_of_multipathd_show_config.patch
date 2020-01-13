@@ -1,0 +1,29 @@
+From 85e9152ea6a95c144f6a50e47bba12e7fab65ef2 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Tue, 8 Dec 2015 11:51:11 +0000
+Subject: [PATCH] [multipath] collect output of 'multipathd show config'
+
+Resolves: #697.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/multipath.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/sos/plugins/multipath.py b/sos/plugins/multipath.py
+index 22fe16c..7d61578 100644
+--- a/sos/plugins/multipath.py
++++ b/sos/plugins/multipath.py
+@@ -29,7 +29,8 @@ class Multipath(Plugin, RedHatPlugin, DebianPlugin, UbuntuPlugin):
+         ])
+         self.add_cmd_output([
+             "multipath -l",
+-            "multipath -v4 -ll"
++            "multipath -v4 -ll",
++            "multipathd show config"
+         ])
+ 
+ 
+-- 
+1.8.3.1
+

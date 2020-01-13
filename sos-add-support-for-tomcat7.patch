@@ -1,0 +1,48 @@
+From 874cc7d0889adf32b8c36bb218212d3304d43d5b Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Mon, 20 Oct 2014 09:13:07 +0100
+Subject: [PATCH] [tomcat] add support for tomcat7 and log size limits
+
+Based on a patch from Pavel Moravec in Issue #412.
+
+Fixes #412.
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/tomcat.py | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/sos/plugins/tomcat.py b/sos/plugins/tomcat.py
+index b7aea2c..4f78c1d 100644
+--- a/sos/plugins/tomcat.py
++++ b/sos/plugins/tomcat.py
+@@ -22,17 +22,21 @@ class Tomcat(Plugin, RedHatPlugin):
+     plugin_name = 'tomcat'
+     profiles = ('webserver', 'java', 'services')
+ 
+-    packages = ('tomcat6',)
++    packages = ('tomcat6', 'tomcat')
+ 
+     def setup(self):
+         self.add_copy_spec([
+-            "/etc/tomcat6",
+-            "/var/log/tomcat6/catalina.out"
++            "/etc/tomcat",
++            "/etc/tomcat6"
+         ])
+ 
++        limit = self.get_option("log_size")
++        log_glob = "/var/log/tomcat*/catalina.out"
++        self.add_copy_spec_limit(log_glob, sizelimit=limit)
++
+     def postproc(self):
+-        self.do_file_sub(
+-            "/etc/tomcat6/tomcat-users.xml",
++        self.do_path_regex_sub(
++            r"\/etc\/tomcat.*\/tomcat-users.xml",
+             r"password=(\S*)",
+             r'password="********"'
+         )
+-- 
+1.9.3
+

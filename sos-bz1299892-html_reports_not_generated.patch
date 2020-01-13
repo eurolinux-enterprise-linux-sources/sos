@@ -1,0 +1,12 @@
+diff -up sos-3.2/sos/sosreport.py.org sos-3.2/sos/sosreport.py
+--- sos-3.2/sos/sosreport.py.org	2016-10-19 15:25:49.630273071 -0400
++++ sos-3.2/sos/sosreport.py	2016-10-19 15:26:02.880192680 -0400
+@@ -238,7 +238,7 @@ class SoSOptions(object):
+     _list_profiles = False
+     _config_file = ""
+     _tmp_dir = ""
+-    _report = True
++    _report = False
+     _compression_type = 'auto'
+ 
+     _options = None

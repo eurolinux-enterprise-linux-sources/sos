@@ -1,0 +1,26 @@
+From e8428d458cfd65bdc34d69f32db0bf4f5aca7540 Mon Sep 17 00:00:00 2001
+From: "Bryn M. Reeves" <bmr@redhat.com>
+Date: Thu, 2 Oct 2014 17:16:55 +0100
+Subject: [PATCH] [yum] call rhsm-debug with --no-subscriptions
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/yum.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sos/plugins/yum.py b/sos/plugins/yum.py
+index 7dac5e4..816e2b0 100644
+--- a/sos/plugins/yum.py
++++ b/sos/plugins/yum.py
+@@ -54,7 +54,7 @@ class Yum(Plugin, RedHatPlugin):
+             "subscription-manager list --consumed"
+         ])
+         self.add_cmd_output("rhsm-debug system --sos --no-archive "
+-                            "--destination %s"
++                            "--no-subscriptions --destination %s"
+                             % self.get_cmd_output_path())
+ 
+         if self.get_option("yumlist"):
+-- 
+1.9.3
+

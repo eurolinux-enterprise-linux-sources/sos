@@ -1,0 +1,50 @@
+From fe3f9864c380e1bcd211368b75d9a27ad694a0a9 Mon Sep 17 00:00:00 2001
+From: Jirka Hladky <jhladky@redhat.com>
+Date: Fri, 26 Feb 2016 17:35:26 +0100
+Subject: [PATCH] [processor] Added cpuid command
+
+Enhanced reporting capabilitis about CPU by adding cpuid command
+
+For details on cpuid command please see
+http://www.etallen.com/cpuid.html
+
+After having a discussion with author of cpuid Todd Allen <todd@etallen.com>
+we think that it would be best to have both human readable output
+of cpuid as well as hex output of cpuid in the sos report.
+
+The hex output can be converted into human readable format with
+cpuid -f <file>. This is usefull when version of cpuid on server
+where sos report has been executed is old. New version of cpuid
+can provide more precise infomration about the cpu.
+
+Signed-off-by: Jirka Hladky <jhladky@redhat.com>
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/processor.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/sos/plugins/processor.py b/sos/plugins/processor.py
+index e69f404..37a1b27 100644
+--- a/sos/plugins/processor.py
++++ b/sos/plugins/processor.py
+@@ -22,7 +22,7 @@ class Processor(Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin):
+     plugin_name = 'processor'
+     profiles = ('system', 'hardware', 'memory')
+     files = ('/proc/cpuinfo',)
+-    packages = ('cpufreq-utils')
++    packages = ('cpufreq-utils', 'cpuid')
+ 
+     def setup(self):
+         self.add_copy_spec([
+@@ -37,6 +37,8 @@ class Processor(Plugin, RedHatPlugin, UbuntuPlugin, DebianPlugin):
+             "cpupower idle-info",
+             "cpupower frequency-info",
+             "cpufreq-info"
++            "cpuid",
++            "cpuid -r"
+         ])
+ 
+         if '86' in self.policy().get_arch():
+-- 
+1.8.3.1
+

@@ -1,0 +1,46 @@
+From d19bc046d549aaf634314a257dd22623df731648 Mon Sep 17 00:00:00 2001
+From: Bryn M. Reeves <bmr@redhat.com>
+Date: Tue, 3 Mar 2015 14:54:48 +0000
+Subject: [PATCH] [networking] test nmcli status before using output
+
+The networking module assumes that nmcli commands succeed if the
+results object is not None; this is not valid and will lead to
+errors in subsequent commands if the call returned an error
+message instead of the expected content:
+
+  [plugin:networking] collecting output of 'nmcli con show conf 'Error: nmcli (0.9.10.0) and NetworkManager (unknown) versions don't match. Force execution using --nocheck, but the results are unpredictable.''
+  Traceback (most recent call last):
+    File "/usr/sbin/sosreport", line 25, in <module>
+      main(sys.argv[1:])
+    File "/usr/lib/python2.7/site-packages/sos/sosreport.py", line 1459, in main
+      sos.execute()
+  ValueError: No closing quotation
+
+Signed-off-by: Bryn M. Reeves <bmr@redhat.com>
+---
+ sos/plugins/networking.py |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sos/plugins/networking.py b/sos/plugins/networking.py
+index 9f6ece0..ae6cb1b 100644
+--- a/sos/plugins/networking.py
++++ b/sos/plugins/networking.py
+@@ -142,13 +142,13 @@ class Networking(Plugin):
+ 
+         nmcli_con_show_result = self.call_ext_prog(
+             "nmcli --terse --fields NAME con show")
+-        if nmcli_con_show_result:
++        if nmcli_con_show_result['status'] == 0:
+             for con in nmcli_con_show_result['output'].splitlines():
+                 self.add_cmd_output("nmcli con show conf '%s'" % con)
+ 
+         nmcli_dev_status_result = self.call_ext_prog(
+             "nmcli --terse --fields DEVICE dev status")
+-        if nmcli_dev_status_result:
++        if nmcli_dev_status_result['status'] == 0:
+             for dev in nmcli_dev_status_result['output'].splitlines():
+                 self.add_cmd_output("nmcli device show "+dev)
+ 
+-- 
+1.7.1
+

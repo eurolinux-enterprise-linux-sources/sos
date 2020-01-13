@@ -1,0 +1,125 @@
+From 1fd12690870e85e8ac83b0e99bb272ce4489dc60 Mon Sep 17 00:00:00 2001
+From: Pavel Moravec <pmoravec@redhat.com>
+Date: Wed, 13 Jan 2016 13:59:52 +0100
+Subject: [PATCH] [reporting] deal with UTF-8 characters
+
+replace str class functions by unicode variants:
+1) "\n".join(buf) needs to pass decoded UTF-8 text
+2) uniform python2 and python3 str/unicode type
+3) fd.write needs to replace str(..) by some other function name
+4) fd.write needs to encode UTF-8
+5) update tests/report_tests.py like 2)
+
+Resolves: #722, #723.
+
+Signed-off-by: Pavel Moravec <pmoravec@redhat.com>
+---
+ sos/reporting.py      |  7 ++++---
+ sos/sosreport.py      |  3 ++-
+ tests/report_tests.py | 14 +++++++-------
+ 3 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/sos/reporting.py b/sos/reporting.py
+index 1e20dbe..23a5005 100644
+--- a/sos/reporting.py
++++ b/sos/reporting.py
+@@ -138,15 +139,16 @@ class PlainTextReport(object):
+     def __init__(self, report_node):
+         self.report_node = report_node
+ 
+-    def __str__(self):
++    def unicode(self):
+         self.buf = buf = []
+         for section_name, section_contents in sorted(self.report_node.data.iteritems()):
+             buf.append(section_name + "\n" + self.DIVIDER)
+             for type_, format_, header in self.subsections:
+                 self.process_subsection(section_contents, type_.ADDS_TO,
+                                         header, format_)
+-
+-        return "\n".join(buf)
++        output = u'\n'.join(map(lambda i: (i.decode('utf8', 'ignore') if isinstance(i, bytes)
++                                           else i), buf))
++        return output.encode('utf-8', 'ignore')
+ 
+     def process_subsection(self, section, key, header, format_):
+         if key in section:
+diff --git a/sos/sosreport.py b/sos/sosreport.py
+index 39972ba..469bc11 100644
+--- a/sos/sosreport.py
++++ b/sos/sosreport.py
+@@ -1356,7 +1356,8 @@ class SoSReport(object):
+             report.add(section)
+         try:
+             fd = self.get_temp_file()
+-            fd.write(str(PlainTextReport(report)))
++            output = PlainTextReport(report).unicode()
++            fd.write(output)
+             fd.flush()
+             self.archive.add_file(fd.name, dest=os.path.join('sos_reports',
+                                                              'sos.txt'))
+diff --git a/tests/report_tests.py b/tests/report_tests.py
+index 3963510..dd39066 100644
+--- a/tests/report_tests.py
++++ b/tests/report_tests.py
+@@ -66,19 +66,19 @@ class TestPlainReport(unittest.TestCase):
+         self.div = PlainTextReport.DIVIDER
+ 
+     def test_basic(self):
+-        self.assertEquals("", str(PlainTextReport(self.report)))
++        self.assertEquals("", PlainTextReport(self.report).unicode())
+ 
+     def test_one_section(self):
+         self.report.add(self.section)
+ 
+-        self.assertEquals("plugin\n" + self.div, str(PlainTextReport(self.report)))
++        self.assertEquals("plugin\n" + self.div, PlainTextReport(self.report).unicode())
+ 
+     def test_two_sections(self):
+         section1 = Section(name="first")
+         section2 = Section(name="second")
+         self.report.add(section1, section2)
+ 
+-        self.assertEquals("first\n" + self.div + "\nsecond\n" + self.div, str(PlainTextReport(self.report)))
++        self.assertEquals("first\n" + self.div + "\nsecond\n" + self.div, PlainTextReport(self.report).unicode())
+ 
+     def test_command(self):
+         cmd = Command(name="ls -al /foo/bar/baz",
+@@ -88,7 +88,7 @@ class TestPlainReport(unittest.TestCase):
+         self.report.add(self.section)
+ 
+         self.assertEquals("plugin\n" + self.div + "\n-  commands executed:\n  * ls -al /foo/bar/baz",
+-                str(PlainTextReport(self.report)))
++                PlainTextReport(self.report).unicode())
+ 
+     def test_copied_file(self):
+         cf = CopiedFile(name="/etc/hosts", href="etc/hosts")
+@@ -96,7 +96,7 @@ class TestPlainReport(unittest.TestCase):
+         self.report.add(self.section)
+ 
+         self.assertEquals("plugin\n" + self.div + "\n-  files copied:\n  * /etc/hosts",
+-                str(PlainTextReport(self.report)))
++                PlainTextReport(self.report).unicode())
+ 
+     def test_created_file(self):
+         crf = CreatedFile(name="sample.txt")
+@@ -104,7 +104,7 @@ class TestPlainReport(unittest.TestCase):
+         self.report.add(self.section)
+ 
+         self.assertEquals("plugin\n" + self.div + "\n-  files created:\n  * sample.txt",
+-                str(PlainTextReport(self.report)))
++                PlainTextReport(self.report).unicode())
+ 
+     def test_alert(self):
+         alrt = Alert("this is an alert")
+@@ -112,7 +112,7 @@ class TestPlainReport(unittest.TestCase):
+         self.report.add(self.section)
+ 
+         self.assertEquals("plugin\n" + self.div + "\n-  alerts:\n  ! this is an alert",
+-                str(PlainTextReport(self.report)))
++                PlainTextReport(self.report).unicode())
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+1.8.3.1
+
